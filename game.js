@@ -28,6 +28,10 @@ const PIECES = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+// Colores de las piezas ya asentadas en el tablero (efecto "gris al tocar el suelo")
+const LANDED_COLORS = ['#5b5b6e', '#666678'];
+const LINE_CLEAR_DURATION = 300; // ms que dura el flash al limpiar líneas
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -40,7 +44,7 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, clearingLines;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -93,23 +97,31 @@ function merge() {
         board[current.y + r][current.x + c] = current.shape[r][c];
 }
 
-function clearLines() {
-  let cleared = 0;
-  for (let r = ROWS - 1; r >= 0; r--) {
-    if (board[r].every(v => v !== 0)) {
-      board.splice(r, 1);
-      board.unshift(new Array(COLS).fill(0));
-      cleared++;
-      r++;
-    }
-  }
-  if (cleared) {
-    lines += cleared;
-    score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
-    updateHUD();
-  }
+function finishClearingLines() {
+  const rows = new Set(clearingLines.rows);
+  const remaining = board.filter((_, r) => !rows.has(r));
+  const cleared = ROWS - remaining.length;
+  const emptyRows = Array.from({ length: cleared }, () => new Array(COLS).fill(0));
+  board = emptyRows.concat(remaining);
+
+  const prevLevel = level;
+  lines += cleared;
+  score += (LINE_SCORES[cleared] || 0) * level;
+  level = Math.floor(lines / 10) + 1;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  updateHUD();
+  flashValue(linesEl);
+  flashValue(scoreEl);
+  if (level !== prevLevel) flashValue(levelEl);
+
+  clearingLines = null;
+  spawn();
+}
+
+function flashValue(el) {
+  el.classList.remove('pop');
+  void el.offsetWidth;
+  el.classList.add('pop');
 }
 
 function ghostY() {
@@ -122,6 +134,9 @@ function hardDrop() {
   const gy = ghostY();
   score += (gy - current.y) * 2;
   current.y = gy;
+  canvas.classList.remove('shake');
+  void canvas.offsetWidth;
+  canvas.classList.add('shake');
   lockPiece();
 }
 
@@ -137,8 +152,15 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
-  spawn();
+  const fullRows = [];
+  for (let r = 0; r < ROWS; r++) {
+    if (board[r].every(v => v !== 0)) fullRows.push(r);
+  }
+  if (fullRows.length) {
+    clearingLines = { rows: fullRows, start: performance.now() };
+  } else {
+    spawn();
+  }
 }
 
 function spawn() {
@@ -156,9 +178,9 @@ function updateHUD() {
   levelEl.textContent = level;
 }
 
-function drawBlock(context, x, y, colorIndex, size, alpha) {
+function drawBlock(context, x, y, colorIndex, size, alpha, colorOverride) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const color = colorOverride || COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
@@ -189,22 +211,35 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
 
-  // board
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++)
-      drawBlock(ctx, c, r, board[r][c], BLOCK);
+  // board: las piezas ya asentadas se pintan en gris (efecto "toca el suelo")
+  const now = performance.now();
+  const flashingRows = clearingLines ? new Set(clearingLines.rows) : null;
+  const blink = clearingLines
+    ? Math.sin(((now - clearingLines.start) / LINE_CLEAR_DURATION) * Math.PI * 6) > 0
+    : false;
 
-  // ghost
-  const gy = ghostY();
-  for (let r = 0; r < current.shape.length; r++)
-    for (let c = 0; c < current.shape[r].length; c++)
-      if (current.shape[r][c])
-        drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!board[r][c]) continue;
+      let color = LANDED_COLORS[(r + c) % 2];
+      if (flashingRows && flashingRows.has(r)) color = blink ? '#ffffff' : color;
+      drawBlock(ctx, c, r, board[r][c], BLOCK, 1, color);
+    }
+  }
 
-  // current piece
-  for (let r = 0; r < current.shape.length; r++)
-    for (let c = 0; c < current.shape[r].length; c++)
-      drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+  if (!clearingLines) {
+    // ghost
+    const gy = ghostY();
+    for (let r = 0; r < current.shape.length; r++)
+      for (let c = 0; c < current.shape[r].length; c++)
+        if (current.shape[r][c])
+          drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
+
+    // current piece
+    for (let r = 0; r < current.shape.length; r++)
+      for (let c = 0; c < current.shape[r].length; c++)
+        drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+  }
 }
 
 function drawNext() {
@@ -243,13 +278,20 @@ function togglePause() {
 function loop(ts) {
   const dt = ts - lastTime;
   lastTime = ts;
-  dropAccum += dt;
-  if (dropAccum >= dropInterval) {
-    dropAccum = 0;
-    if (!collide(current.shape, current.x, current.y + 1)) {
-      current.y++;
-    } else {
-      lockPiece();
+
+  if (clearingLines) {
+    if (ts - clearingLines.start >= LINE_CLEAR_DURATION) {
+      finishClearingLines();
+    }
+  } else {
+    dropAccum += dt;
+    if (dropAccum >= dropInterval) {
+      dropAccum = 0;
+      if (!collide(current.shape, current.x, current.y + 1)) {
+        current.y++;
+      } else {
+        lockPiece();
+      }
     }
   }
   draw();
@@ -265,6 +307,7 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  clearingLines = null;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
@@ -276,7 +319,7 @@ function init() {
 
 document.addEventListener('keydown', e => {
   if (e.code === 'KeyP') { togglePause(); return; }
-  if (paused || gameOver) return;
+  if (paused || gameOver || clearingLines) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
