@@ -1,6 +1,6 @@
 # Tetris
 
-Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canvas y CSS. Sin dependencias externas, sin frameworks, sin proceso de build: solo abrir y jugar.
+Implementación de **Tetris** en JavaScript vanilla, usando HTML5 Canvas y CSS. Sin dependencias externas, sin frameworks, sin proceso de build: solo abrir y jugar. Incluye mecánicas de nivel competitivo (SRS, T-Spins, hold, 7-bag), tres modos de juego, audio 100% sintetizado y un apartado visual con animaciones extremas: bloques 3D con glow dinámico, ondas de choque, estelas de caída, glitch en Game Over, perspectiva 3D que sigue al ratón y mucho más.
 
 ![Tech](https://img.shields.io/badge/HTML5-Canvas-orange)
 ![Tech](https://img.shields.io/badge/CSS3-blueviolet)
@@ -14,14 +14,12 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
   - [Tabla de contenidos](#tabla-de-contenidos)
   - [Qué hace el proyecto](#qué-hace-el-proyecto)
   - [Cómo ejecutar el juego](#cómo-ejecutar-el-juego)
-    - [Opción 1: abrir el archivo directamente](#opción-1-abrir-el-archivo-directamente)
-    - [Opción 2: servidor local (recomendado)](#opción-2-servidor-local-recomendado)
+  - [Modos de juego](#modos-de-juego)
   - [Controles](#controles)
-  - [Cómo funciona](#cómo-funciona)
-    - [1. `index.html`](#1-indexhtml)
-    - [2. `style.css`](#2-stylecss)
-    - [3. `game.js`](#3-gamejs)
-    - [Flujo del juego](#flujo-del-juego)
+  - [Mecánicas](#mecánicas)
+  - [Apartado visual y de audio](#apartado-visual-y-de-audio)
+  - [Accesibilidad y opciones](#accesibilidad-y-opciones)
+  - [Cómo funciona el código](#cómo-funciona-el-código)
   - [Tecnologías](#tecnologías)
   - [Estructura del proyecto](#estructura-del-proyecto)
   - [Personalización](#personalización)
@@ -31,25 +29,29 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
 
 ## Qué hace el proyecto
 
-Es una versión jugable del Tetris clásico con todas las mecánicas que esperarías:
+Una versión de Tetris con las mecánicas del "Tetris Guideline" moderno además de un apartado de pulido visual muy por encima de un clon básico:
 
-- Tablero de **10 × 20** celdas.
-- Las **7 piezas estándar** (I, O, T, S, Z, J, L) con colores diferenciados.
-- **Rotación** con _wall kicks_ básicos (pequeños desplazamientos para que la pieza pueda rotar pegada a la pared).
-- **Soft drop** (bajada acelerada) y **hard drop** (caída instantánea).
-- **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.
-- **Vista previa** de la siguiente pieza.
-- **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
-- **Niveles** que aumentan cada 10 líneas y aceleran la caída.
-- **Pausa** y **Game Over** con opción de reinicio.
+- Tablero de **10 × 20** con las 7 piezas estándar.
+- **7-bag randomizer**: cada set de 7 piezas se reparte barajado, nunca hay rachas largas sin una pieza concreta.
+- **Hold piece** (guardar pieza para más tarde).
+- **SRS** (Super Rotation System) con tabla oficial de _wall kicks_.
+- **T-Spin** y **Mini T-Spin** con detección por regla de las 3 esquinas y bonus de puntuación.
+- **Lock delay** con reinicio limitado al mover/rotar (hasta 15 reinicios).
+- **Back-to-back** y **combos** con multiplicador de puntuación.
+- **DAS/ARR propio**: repetición de movimiento horizontal/soft-drop gestionada a mano, no depende del autorepeat del navegador.
+- **All Clear / Perfect Clear** con bonus y celebración especial.
+- Cola de **5 siguientes piezas** y panel de **hold**.
+- **3 modos de juego**: Maratón, Sprint (40 líneas) y Ultra (2 minutos).
+- **Highscores y opciones persistentes** en `localStorage`.
+- **Audio** 100% sintetizado con la Web Audio API (sin ficheros externos).
+- **Controles táctiles, mando (Gamepad API) y teclado**, canvas responsive.
+- **Modo daltónico** (símbolo distintivo por pieza) y **4 temas de color**.
 
 ---
 
 ## Cómo ejecutar el juego
 
-No hay nada que instalar ni compilar. Tienes dos opciones:
-
-### Opción 1: abrir el archivo directamente
+No hay nada que instalar ni compilar.
 
 ```bash
 open index.html        # macOS
@@ -57,96 +59,110 @@ xdg-open index.html    # Linux
 start index.html       # Windows
 ```
 
-### Opción 2: servidor local (recomendado)
-
-Cualquier servidor estático funciona. Algunos ejemplos:
+O con un servidor local (recomendado, para que `localStorage` funcione igual que en producción):
 
 ```bash
-# Con Python 3
 python3 -m http.server 8000
-
-# Con Node.js (npx)
+# o
 npx serve .
-
-# Con PHP
-php -S localhost:8000
 ```
 
-Después abre `http://localhost:8000` en el navegador.
+Después abre `http://localhost:8000`.
+
+---
+
+## Modos de juego
+
+| Modo | Descripción |
+| --- | --- |
+| **Maratón** | Clásico, sin fin. Sube de nivel cada 10 líneas. |
+| **Sprint** | Limpia 40 líneas lo más rápido posible. Se cronometra el tiempo. |
+| **Ultra** | 2 minutos para conseguir la máxima puntuación posible. |
+
+El highscore de cada modo se guarda por separado en `localStorage`.
 
 ---
 
 ## Controles
 
-| Tecla     | Acción                            |
-| --------- | --------------------------------- |
-| `←` / `→` | Mover la pieza horizontalmente    |
-| `↑` o `X` | Rotar la pieza en sentido horario |
-| `↓`       | Soft drop (bajar más rápido)      |
-| `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
+| Tecla | Acción |
+| --- | --- |
+| `←` / `→` | Mover (con DAS/ARR propio) |
+| `↑` / `X` | Rotar en sentido horario |
+| `Z` / `Ctrl` | Rotar en sentido antihorario |
+| `↓` | Soft drop |
+| `Espacio` | Hard drop |
+| `C` / `Shift` | Guardar pieza (hold) |
+| `P` / `Esc` | Pausar / reanudar |
+
+También disponible con **controles táctiles** (botones en pantalla + swipes) en dispositivos con puntero táctil, y con **mando** (Gamepad API): D-pad/stick para mover, botón inferior para rotar, gatillos para hard drop y hombros para hold.
 
 ---
 
-## Cómo funciona
+## Mecánicas
 
-El juego se compone de tres archivos que cooperan:
+- **7-bag** (`refillBag`, `game.js`): baraja `[1..7]` con Fisher-Yates y lo añade a la cola; garantiza que las 7 piezas aparezcan una vez cada 7 turnos.
+- **SRS** (`ROTATION_SHAPES`, `JLSTZ_KICKS`, `I_KICKS`, `attemptRotate`): cada pieza tiene 4 matrices de rotación explícitas; al rotar se prueban hasta 5 desplazamientos (_kicks_) oficiales antes de descartar el giro.
+- **T-Spin** (`detectTSpin`): tras una rotación que deja al T bloqueado, se comprueban las 4 esquinas de su caja 3×3; si 3 o más están ocupadas es T-Spin (completo si las dos esquinas del lado "apuntado" están llenas, si no, mini).
+- **Lock delay** (`loop`, `onSuccessfulMove`): al tocar el suelo hay 500 ms de margen antes de fijar la pieza; moverla o rotarla con éxito reinicia ese margen, hasta 15 veces.
+- **Combo / Back-to-back** (`finishClearingLines`): cada línea consecutiva sin fallar suma `50 × combo × nivel`; encadenar Tetrises o T-Spins con líneas da un multiplicador ×1.5.
+- **Perfect Clear**: si el tablero queda completamente vacío tras una limpieza, bonus extra y confeti de partículas.
+- **DAS/ARR** (`handleInputRepeat`, `dasState`): temporización manual (retardo inicial + repetición) en vez de depender del autorepeat del teclado del navegador.
+
+---
+
+## Apartado visual y de audio
+
+Pensado para que cada acción tenga una respuesta sensorial exagerada:
+
+- Bloques con gradiente/bisel 3D y glow dinámico en la pieza activa.
+- Ghost piece con contorno punteado animado ("láser que respira").
+- Estela de caída en el hard drop y squash & stretch al fijar cualquier pieza.
+- Onda expansiva (shockwave), flash blanco, aberración cromática y "mega shake" en Tetris, T-Spin y Perfect Clear.
+- Confeti de partículas (estrellas/diamantes) en Perfect Clear.
+- Glitch/RGB-split en el título al perder.
+- Vignette + spotlight que sigue a la pieza activa; perspectiva 3D del tablero que reacciona al ratón.
+- Borde del tablero con degradado azul → rojo continuo según la altura de la pila ("peligro").
+- Contador de puntuación animado (roll-up) y progresión de tono (hue-rotate) según el nivel.
+- Partículas variadas (círculos, diamantes, estrellas, chispas) según el tipo de evento.
+- Audio sintetizado con osciladores Web Audio (sin assets): mover, rotar, hold, drops, clears, Tetris, T-Spin, subida de nivel, peligro y Game Over.
+
+---
+
+## Accesibilidad y opciones
+
+- **Controles táctiles** con botones en pantalla y gestos (swipe para mover/soft-drop, tap para rotar, swipe rápido hacia abajo para hard drop).
+- **Canvas responsive**, escalado con `devicePixelRatio` para verse nítido en cualquier pantalla.
+- **Modo daltónico**: dibuja un símbolo distintivo por tipo de pieza, no solo color.
+- **4 temas visuales** (Aurora, Synthwave, Matrix, Mono) intercambiables desde el menú de opciones.
+- **Control de volumen** y opciones persistentes en `localStorage`.
+
+---
+
+## Cómo funciona el código
+
+El juego sigue siendo tres archivos que cooperan, sin build ni dependencias:
 
 ### 1. `index.html`
-
-Define la estructura visual:
-
-- Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
-- Un panel lateral con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** y **GAME OVER**.
+Estructura del tablero, panel lateral (score/lines/level/combo/hold/next), controles táctiles, y tres overlays: selección de modo, pausa/game over, y opciones.
 
 ### 2. `style.css`
-
-Aporta el aspecto visual con estética _dark / retro arcade_: fondo oscuro, tipografía monoespaciada para los marcadores y _backdrop blur_ en los overlays.
+Estética _dark / retro arcade_ con variables CSS de color (`--c1/--c2/--c3`) que permiten cambiar de tema sin tocar el resto de reglas, más todas las animaciones (`shake`, `megaShake`, `zoomPunch`, `glitchText`, `irisIn`, `comboPopMega`...).
 
 ### 3. `game.js`
-
-Contiene toda la lógica del juego. A grandes rasgos:
-
-- **Modelo del tablero**: una matriz `ROWS × COLS` donde cada celda guarda `0` (vacía) o un índice de color (1–7) que identifica la pieza.
-- **Piezas**: definidas como matrices cuadradas. Para rotar se calcula la transposición + reverso de filas (`rotateCW`).
-- **Detección de colisiones** (`collide`): comprueba que ninguna celda de la pieza salga del tablero ni se solape con bloques ya fijados.
-- **Wall kicks** (`tryRotate`): si la rotación choca, intenta desplazar la pieza ±1 y ±2 columnas antes de descartar el giro.
-- **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
-- **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
-- **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
-- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
-- **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
-
-### Flujo del juego
-
-```
-init()
-  ├─ createBoard()                  → matriz vacía
-  ├─ next = randomPiece()
-  ├─ spawn()                        → mueve next a current y genera nueva next
-  └─ requestAnimationFrame(loop)
-        ↓
-   loop(timestamp)
-     ├─ acumula dt
-     ├─ si dt ≥ dropInterval → baja la pieza o llama a lockPiece()
-     ├─ draw()  (grid + tablero + ghost + pieza actual)
-     └─ requestAnimationFrame(loop)
-
-   keydown → mover / rotar / soft-drop / hard-drop / pausa
-```
-
-Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.
+Toda la lógica: tablero, piezas y SRS, sistema de partículas/estelas/shockwaves, puntuación y combos, audio sintetizado, entrada (teclado con DAS/ARR, táctil, mando), persistencia y el bucle principal (`loop`) basado en `requestAnimationFrame`.
 
 ---
 
 ## Tecnologías
 
-- **HTML5** — marcado y dos elementos `<canvas>` (tablero y vista previa).
-- **CSS3** — _flexbox_, variables de color, `backdrop-filter` y `box-shadow`.
-- **JavaScript (ES6+) vanilla** — `const`/`let`, _arrow functions_, _spread operator_, `Array.from`, _template literals_…
-- **Canvas 2D API** — para todo el renderizado del juego.
-- **`requestAnimationFrame`** — para el bucle de juego sincronizado con el navegador.
+- **HTML5** — tres `<canvas>` (tablero, hold, siguientes piezas).
+- **CSS3** — variables de color, `color-mix()`, `backdrop-filter`, `clip-path`, animaciones.
+- **JavaScript (ES6+) vanilla** — sin frameworks ni bundler.
+- **Canvas 2D API** — todo el renderizado.
+- **Web Audio API** — audio sintetizado, sin ficheros.
+- **Gamepad API** — soporte de mando.
+- **`localStorage`** — highscores y opciones.
 
 **Sin dependencias.** No hay `package.json`, ni bundler, ni transpilador.
 
@@ -155,10 +171,9 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 ## Estructura del proyecto
 
 ```
-03-tetris/
-├── index.html      # Estructura del DOM y canvas
-├── style.css       # Estilos del juego (dark theme)
-├── game.js         # Toda la lógica del Tetris (~300 líneas)
+├── index.html      # Estructura del DOM, overlays y canvases
+├── style.css       # Estilos, temas y animaciones
+├── game.js         # Toda la lógica del Tetris
 └── README.md
 ```
 
@@ -166,18 +181,17 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 
 ## Personalización
 
-Algunos parámetros fáciles de tunear en `game.js`:
+| Constante | Significado | Por defecto |
+| --- | --- | --- |
+| `COLS` / `ROWS` | Tamaño del tablero | `10` / `20` |
+| `BLOCK` | Tamaño lógico de cada celda (px) | `30` |
+| `NEXT_COUNT` | Piezas visibles en la cola de "siguientes" | `5` |
+| `LOCK_DELAY` | Margen antes de fijar una pieza apoyada (ms) | `500` |
+| `DAS` / `ARR` | Retardo inicial / repetición del movimiento horizontal (ms) | `150` / `35` |
+| `ULTRA_DURATION` | Duración del modo Ultra (ms) | `120000` |
+| `LINE_SCORES` | Puntos por 1–4 líneas | `[0,100,300,500,800]` |
 
-| Constante      | Significado                              | Por defecto           |
-| -------------- | ---------------------------------------- | --------------------- |
-| `COLS`         | Columnas del tablero                     | `10`                  |
-| `ROWS`         | Filas del tablero                        | `20`                  |
-| `BLOCK`        | Tamaño en píxeles de cada celda          | `30`                  |
-| `COLORS`       | Paleta de colores por tipo de pieza      | 7 colores             |
-| `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
-| `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
-
-> Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
+> Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar `width`/`height` del `<canvas id="board">` en `index.html`.
 
 ---
 
