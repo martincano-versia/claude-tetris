@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Tetris</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -10,49 +10,141 @@
   <div class="wrapper">
     <h1 class="game-title">TETRIS</h1>
     <div class="game-container">
-      <div class="board-wrap">
+      <div class="board-wrap" id="board-wrap">
         <canvas id="board" width="300" height="600"></canvas>
-        <div id="combo-text" class="combo-text"></div>
+        <div class="board-vignette"></div>
+        <div class="flash-overlay" id="flash-overlay"></div>
+        <div class="chroma-overlay" id="chroma-overlay"></div>
+        <div class="danger-label" id="danger-label">PELIGRO</div>
+        <div id="combo-text" class="combo-text"><span id="combo-main"></span><span class="subtext" id="combo-sub"></span></div>
       </div>
 
       <aside class="panel">
-        <div class="panel-section">
-          <span class="label">SCORE</span>
-          <span class="value" id="score">0</span>
+        <div class="panel-row">
+          <div class="panel-section">
+            <span class="label">SCORE</span>
+            <span class="value" id="score">0</span>
+          </div>
         </div>
-        <div class="panel-section">
-          <span class="label">LINES</span>
-          <span class="value" id="lines">0</span>
+        <div class="panel-row">
+          <div class="panel-section">
+            <span class="label">LINES</span>
+            <span class="value small" id="lines">0</span>
+          </div>
+          <div class="panel-section">
+            <span class="label">LEVEL</span>
+            <span class="value small" id="level">1</span>
+          </div>
         </div>
-        <div class="panel-section">
-          <span class="label">LEVEL</span>
-          <span class="value" id="level">1</span>
+        <div class="panel-row">
+          <div class="panel-section">
+            <span class="label">COMBO</span>
+            <span class="value small" id="combo-value">-</span>
+          </div>
+          <div class="panel-section" id="mode-timer-section" style="display:none;">
+            <span class="label" id="mode-timer-label">TIEMPO</span>
+            <span class="value small" id="mode-timer">0:00</span>
+          </div>
         </div>
 
-        <div class="panel-section">
-          <span class="label">NEXT</span>
-          <canvas id="next-canvas" width="120" height="120"></canvas>
+        <div class="panel-row">
+          <div class="panel-section">
+            <span class="label">HOLD (C)</span>
+            <canvas id="hold-canvas" width="100" height="100"></canvas>
+          </div>
+          <div class="panel-section">
+            <span class="label">NEXT</span>
+            <canvas id="next-canvas" width="100" height="320"></canvas>
+          </div>
         </div>
 
         <div class="panel-section controls">
-          <span class="label">CONTROLS</span>
+          <span class="label">CONTROLES</span>
           <ul>
             <li><kbd>←</kbd><kbd>→</kbd> mover</li>
             <li><kbd>↑</kbd> rotar</li>
-            <li><kbd>↓</kbd> bajar</li>
-            <li><kbd>Space</kbd> caída</li>
-            <li><kbd>P</kbd> pausa</li>
+            <li><kbd>Z</kbd> rotar izq.</li>
+            <li><kbd>↓</kbd> soft drop</li>
+            <li><kbd>Space</kbd> hard drop</li>
+            <li><kbd>C</kbd> guardar (hold)</li>
+            <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
           </ul>
+        </div>
+
+        <div class="panel-section">
+          <button class="icon-btn" id="options-btn" style="width:100%;">⚙ OPCIONES</button>
         </div>
       </aside>
     </div>
-    <div class="ambient-glow"></div>
+
+    <div class="touch-controls" id="touch-controls">
+      <button class="touch-btn" id="t-left">◀</button>
+      <button class="touch-btn" id="t-rotate">⟳</button>
+      <button class="touch-btn" id="t-right">▶</button>
+      <button class="touch-btn" id="t-hold">H</button>
+      <button class="touch-btn" id="t-down">▼</button>
+      <button class="touch-btn" id="t-drop">⤓</button>
+    </div>
+
+    <div class="ambient-glow">
+      <div class="parallax-shape shape-a"></div>
+      <div class="parallax-shape shape-b"></div>
+      <div class="parallax-shape shape-c"></div>
+    </div>
+
+    <!-- Selección de modo / pantalla de inicio -->
+    <div id="start-overlay" class="overlay">
+      <div class="overlay-box">
+        <p id="start-title" style="font-size:20px;font-weight:900;letter-spacing:3px;color:var(--c1);">ELIGE UN MODO</p>
+        <div class="mode-select">
+          <button class="mode-btn selected" data-mode="marathon"><strong>MARATÓN</strong>Clásico, sin fin</button>
+          <button class="mode-btn" data-mode="sprint"><strong>SPRINT</strong>40 líneas</button>
+          <button class="mode-btn" data-mode="ultra"><strong>ULTRA</strong>2 minutos</button>
+        </div>
+        <button class="primary-btn" id="start-btn">JUGAR</button>
+        <div class="overlay-links">
+          <button class="link-btn" id="start-options-btn">Opciones</button>
+        </div>
+        <p id="highscore-line" style="font-size:11px;color:#6b6b8a;letter-spacing:1px;"></p>
+      </div>
+    </div>
 
     <div id="overlay" class="overlay hidden">
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <p id="overlay-stats"></p>
         <button id="restart-btn">Reiniciar</button>
+        <div class="overlay-links">
+          <button class="link-btn" id="menu-btn">Menú</button>
+          <button class="link-btn" id="pause-options-btn">Opciones</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="options-overlay" class="overlay hidden">
+      <div class="overlay-box">
+        <p style="font-size:18px;font-weight:900;letter-spacing:3px;color:var(--c1);">OPCIONES</p>
+        <div class="options-list">
+          <div class="option-row">
+            <span class="label">VOLUMEN</span>
+            <input type="range" id="volume-range" min="0" max="1" step="0.05" />
+          </div>
+          <div class="option-row">
+            <span class="label">MODO DALTÓNICO</span>
+            <input type="checkbox" id="colorblind-toggle" />
+          </div>
+          <div class="option-row">
+            <span class="label">TEMA</span>
+            <div class="theme-swatches">
+              <div class="swatch" data-theme="aurora" style="background:linear-gradient(135deg,#7aa2f7,#ba68c8);"></div>
+              <div class="swatch" data-theme="synthwave" style="background:linear-gradient(135deg,#ff2e97,#ff9f45);"></div>
+              <div class="swatch" data-theme="matrix" style="background:linear-gradient(135deg,#39ff14,#00c853);"></div>
+              <div class="swatch" data-theme="mono" style="background:linear-gradient(135deg,#ffffff,#00e5ff);"></div>
+            </div>
+          </div>
+        </div>
+        <button class="primary-btn" id="close-options-btn">CERRAR</button>
       </div>
     </div>
   </div>
