@@ -10,7 +10,10 @@
   <div class="wrapper">
     <h1 class="game-title">TETRIS</h1>
     <div class="game-container">
-      <canvas id="board" width="300" height="600"></canvas>
+      <div class="board-wrap">
+        <canvas id="board" width="300" height="600"></canvas>
+        <div id="combo-text" class="combo-text"></div>
+      </div>
 
       <aside class="panel">
         <div class="panel-section">
@@ -43,6 +46,7 @@
         </div>
       </aside>
     </div>
+    <div class="ambient-glow"></div>
 
     <div id="overlay" class="overlay hidden">
       <div class="overlay-box">

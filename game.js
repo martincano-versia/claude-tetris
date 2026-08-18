@@ -43,8 +43,13 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const comboText = document.getElementById('combo-text');
+
+const COMBO_LABELS = { 1: 'SINGLE', 2: 'DOUBLE', 3: 'TRIPLE', 4: 'TETRIS!' };
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, clearingLines;
+let particles = [];
+let ambientAccum = 0;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -113,6 +118,7 @@ function finishClearingLines() {
   flashValue(linesEl);
   flashValue(scoreEl);
   if (level !== prevLevel) flashValue(levelEl);
+  showComboText(cleared);
 
   clearingLines = null;
   spawn();
@@ -122,6 +128,195 @@ function flashValue(el) {
   el.classList.remove('pop');
   void el.offsetWidth;
   el.classList.add('pop');
+}
+
+function showComboText(cleared) {
+  const label = COMBO_LABELS[cleared];
+  if (!label) return;
+  comboText.textContent = label;
+  comboText.style.color = cleared === 4 ? '#ffd54f' : '#7aa2f7';
+  comboText.classList.remove('show');
+  void comboText.offsetWidth;
+  comboText.classList.add('show');
+}
+
+// ---- Sistema de partículas ----
+
+function spawnParticles(cx, cy, opts = {}) {
+  const {
+    count = 10,
+    colors = ['#ffffff'],
+    speed = 2.5,
+    spread = Math.PI * 2,
+    baseAngle = 0,
+    life = 450,
+    size = 3,
+    gravity = 0.05,
+  } = opts;
+  for (let i = 0; i < count; i++) {
+    const angle = baseAngle + (Math.random() - 0.5) * spread;
+    const v = speed * (0.5 + Math.random() * 0.8);
+    particles.push({
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * v,
+      vy: Math.sin(angle) * v,
+      life,
+      maxLife: life,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: size * (0.6 + Math.random() * 0.8),
+      gravity,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  const step = dt / 16;
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    p.x += p.vx * step;
+    p.y += p.vy * step;
+    p.vy += p.gravity * step;
+  }
+}
+
+function drawParticles(context) {
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    context.globalAlpha = alpha;
+    context.fillStyle = p.color;
+    context.beginPath();
+    context.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.globalAlpha = 1;
+}
+
+function pieceBounds(shape) {
+  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (!shape[r][c]) continue;
+      minR = Math.min(minR, r);
+      maxR = Math.max(maxR, r);
+      minC = Math.min(minC, c);
+      maxC = Math.max(maxC, c);
+    }
+  }
+  return { minR, maxR, minC, maxC };
+}
+
+function pieceCenterPx(piece) {
+  const { minR, maxR, minC, maxC } = pieceBounds(piece.shape);
+  return {
+    cx: (piece.x + (minC + maxC + 1) / 2) * BLOCK,
+    cy: (piece.y + (minR + maxR + 1) / 2) * BLOCK,
+  };
+}
+
+function pieceColors(piece) {
+  return [COLORS[piece.type]];
+}
+
+function spawnMoveParticles(dir) {
+  const { minC, maxC, minR, maxR } = pieceBounds(current.shape);
+  const edgeC = dir > 0 ? current.x + maxC + 1 : current.x + minC;
+  const cy = (current.y + (minR + maxR + 1) / 2) * BLOCK;
+  spawnParticles(edgeC * BLOCK, cy, {
+    count: 5,
+    colors: pieceColors(current),
+    speed: 1.6,
+    spread: Math.PI * 0.6,
+    baseAngle: dir > 0 ? 0 : Math.PI,
+    life: 220,
+    size: 2.5,
+    gravity: 0.02,
+  });
+}
+
+function spawnRotateParticles() {
+  const { cx, cy } = pieceCenterPx(current);
+  spawnParticles(cx, cy, {
+    count: 12,
+    colors: pieceColors(current),
+    speed: 2.2,
+    spread: Math.PI * 2,
+    life: 320,
+    size: 2.5,
+    gravity: 0.01,
+  });
+}
+
+function spawnSoftDropParticles() {
+  const { minC, maxC, maxR } = pieceBounds(current.shape);
+  const cx = (current.x + (minC + maxC + 1) / 2) * BLOCK;
+  const cy = (current.y + maxR + 1) * BLOCK;
+  spawnParticles(cx, cy, {
+    count: 3,
+    colors: pieceColors(current),
+    speed: 1,
+    spread: Math.PI * 0.4,
+    baseAngle: Math.PI / 2,
+    life: 200,
+    size: 2,
+    gravity: 0.03,
+  });
+}
+
+function spawnLandParticles(piece) {
+  const colors = pieceColors(piece);
+  for (let r = 0; r < piece.shape.length; r++) {
+    for (let c = 0; c < piece.shape[r].length; c++) {
+      if (!piece.shape[r][c]) continue;
+      const px = (piece.x + c + 0.5) * BLOCK;
+      const py = (piece.y + r + 0.5) * BLOCK;
+      spawnParticles(px, py, {
+        count: 4,
+        colors,
+        speed: 1.4,
+        spread: Math.PI * 2,
+        baseAngle: -Math.PI / 2,
+        life: 350,
+        size: 2.5,
+        gravity: 0.06,
+      });
+    }
+  }
+}
+
+function spawnLineClearParticles(row) {
+  for (let c = 0; c < COLS; c++) {
+    const color = COLORS[board[row][c]] || '#ffffff';
+    const px = (c + 0.5) * BLOCK;
+    const py = (row + 0.5) * BLOCK;
+    spawnParticles(px, py, {
+      count: 6,
+      colors: [color, '#ffffff'],
+      speed: 3.5,
+      spread: Math.PI * 2,
+      life: 450,
+      size: 3,
+      gravity: 0.08,
+    });
+  }
+}
+
+function spawnGameOverParticles() {
+  const palette = COLORS.filter(Boolean);
+  spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
+    count: 60,
+    colors: palette,
+    speed: 5,
+    spread: Math.PI * 2,
+    life: 900,
+    size: 3.5,
+    gravity: 0.06,
+  });
 }
 
 function ghostY() {
@@ -144,6 +339,7 @@ function softDrop() {
   if (!collide(current.shape, current.x, current.y + 1)) {
     current.y++;
     score += 1;
+    spawnSoftDropParticles();
     updateHUD();
   } else {
     lockPiece();
@@ -151,14 +347,17 @@ function softDrop() {
 }
 
 function lockPiece() {
+  const landedPiece = current;
   merge();
   const fullRows = [];
   for (let r = 0; r < ROWS; r++) {
     if (board[r].every(v => v !== 0)) fullRows.push(r);
   }
   if (fullRows.length) {
+    fullRows.forEach(spawnLineClearParticles);
     clearingLines = { rows: fullRows, start: performance.now() };
   } else {
+    spawnLandParticles(landedPiece);
     spawn();
   }
 }
@@ -240,6 +439,8 @@ function draw() {
       for (let c = 0; c < current.shape[r].length; c++)
         drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
   }
+
+  drawParticles(ctx);
 }
 
 function drawNext() {
@@ -255,7 +456,7 @@ function drawNext() {
 
 function endGame() {
   gameOver = true;
-  cancelAnimationFrame(animId);
+  spawnGameOverParticles();
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
@@ -276,27 +477,49 @@ function togglePause() {
 }
 
 function loop(ts) {
-  if (gameOver || paused) return;
+  if (paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
 
-  if (clearingLines) {
-    if (ts - clearingLines.start >= LINE_CLEAR_DURATION) {
-      finishClearingLines();
-    }
-  } else {
-    dropAccum += dt;
-    if (dropAccum >= dropInterval) {
-      dropAccum = 0;
-      if (!collide(current.shape, current.x, current.y + 1)) {
-        current.y++;
-      } else {
-        lockPiece();
+  if (!gameOver) {
+    if (clearingLines) {
+      if (ts - clearingLines.start >= LINE_CLEAR_DURATION) {
+        finishClearingLines();
+      }
+    } else {
+      dropAccum += dt;
+      if (dropAccum >= dropInterval) {
+        dropAccum = 0;
+        if (!collide(current.shape, current.x, current.y + 1)) {
+          current.y++;
+        } else {
+          lockPiece();
+        }
+      }
+
+      ambientAccum += dt;
+      if (ambientAccum >= 260) {
+        ambientAccum = 0;
+        spawnParticles(Math.random() * COLS * BLOCK, ROWS * BLOCK - 2, {
+          count: 1,
+          colors: ['rgba(122,162,247,0.6)'],
+          speed: 0.8,
+          spread: Math.PI * 0.3,
+          baseAngle: -Math.PI / 2,
+          life: 1200,
+          size: 1.8,
+          gravity: -0.01,
+        });
       }
     }
   }
+
+  updateParticles(dt);
   draw();
-  animId = requestAnimationFrame(loop);
+
+  if (!gameOver || particles.length > 0) {
+    animId = requestAnimationFrame(loop);
+  }
 }
 
 function init() {
@@ -309,6 +532,9 @@ function init() {
   dropInterval = 1000;
   dropAccum = 0;
   clearingLines = null;
+  particles = [];
+  ambientAccum = 0;
+  comboText.classList.remove('show');
   lastTime = performance.now();
   next = randomPiece();
   spawn();
@@ -324,11 +550,17 @@ document.addEventListener('keydown', e => {
   switch (e.code) {
     case 'ArrowLeft':
       e.preventDefault();
-      if (!collide(current.shape, current.x - 1, current.y)) current.x--;
+      if (!collide(current.shape, current.x - 1, current.y)) {
+        current.x--;
+        spawnMoveParticles(-1);
+      }
       break;
     case 'ArrowRight':
       e.preventDefault();
-      if (!collide(current.shape, current.x + 1, current.y)) current.x++;
+      if (!collide(current.shape, current.x + 1, current.y)) {
+        current.x++;
+        spawnMoveParticles(1);
+      }
       break;
     case 'ArrowDown':
       e.preventDefault();
@@ -337,9 +569,11 @@ document.addEventListener('keydown', e => {
     case 'ArrowUp':
       e.preventDefault();
       tryRotate();
+      spawnRotateParticles();
       break;
     case 'KeyX':
       tryRotate();
+      spawnRotateParticles();
       break;
     case 'Space':
       e.preventDefault();
