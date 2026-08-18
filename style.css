@@ -43,6 +43,18 @@ body {
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+#board.shake {
+  animation: shake 0.25s ease-in-out;
+}
+
 /* ---- Panel lateral ---- */
 .panel {
   width: 160px;
@@ -71,6 +83,16 @@ body {
   font-weight: 700;
   color: #7aa2f7;
   letter-spacing: 1px;
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); color: #ffd54f; }
+  100% { transform: scale(1); }
+}
+
+.value.pop {
+  animation: pop 0.4s ease-out;
 }
 
 #next-canvas {
