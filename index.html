@@ -122,6 +122,33 @@
       </div>
     </div>
 
+    <div id="pause-overlay" class="overlay hidden">
+      <div class="overlay-box">
+        <p id="pause-title">PAUSA</p>
+        <button class="primary-btn" id="resume-btn">Reanudar</button>
+        <div class="overlay-links">
+          <button class="link-btn" id="pause-restart-btn">Reiniciar</button>
+          <button class="link-btn" id="pause-controls-toggle">Ver controles</button>
+          <button class="link-btn" id="pause-options-open-btn">Opciones</button>
+        </div>
+        <div class="controls pause-controls-list hidden" id="pause-controls-list">
+          <ul>
+            <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+            <li><kbd>↑</kbd> rotar</li>
+            <li><kbd>Z</kbd> rotar izq.</li>
+            <li><kbd>↓</kbd> soft drop</li>
+            <li><kbd>Space</kbd> hard drop</li>
+            <li><kbd>C</kbd> guardar (hold)</li>
+            <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
+          </ul>
+        </div>
+        <div class="option-row" id="start-level-row">
+          <span class="label">NIVEL INICIAL</span>
+          <select id="start-level-select"></select>
+        </div>
+      </div>
+    </div>
+
     <div id="options-overlay" class="overlay hidden">
       <div class="overlay-box">
         <p style="font-size:18px;font-weight:900;letter-spacing:3px;color:var(--c1);">OPCIONES</p>
