@@ -124,6 +124,8 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const overlayStats = document.getElementById('overlay-stats');
+const playerNameInput = document.getElementById('player-name-input');
+const overlayRecords = document.getElementById('overlay-records');
 const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const pauseOptionsBtn = document.getElementById('pause-options-btn');
@@ -173,7 +175,12 @@ let selectedMode = 'marathon';
 
 const MAX_START_LEVEL = 15;
 const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, startLevel: 1 };
-const highscores = { marathon: 0, sprint: null, ultra: 0 };
+const highscores = {
+  marathon: 0,
+  sprint: null,
+  ultra: 0,
+  records: { marathon: [], sprint: [], ultra: [] }
+};
 
 // ---- Persistencia ----
 function loadSettings() {
@@ -197,6 +204,65 @@ function loadHighscores() {
 
 function saveHighscores() {
   try { localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(highscores)); } catch (e) { /* ignorar */ }
+}
+
+// ---- Funciones de registros (Unit 1 & 2) ----
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return text.replace(/[&<>"']/g, char => map[char]);
+}
+
+function insertRecord(mode, score, name, combo, lines) {
+  if (!highscores.records) highscores.records = { marathon: [], sprint: [], ultra: [] };
+  if (!highscores.records[mode]) highscores.records[mode] = [];
+
+  const record = {
+    name: name || 'Anónimo',
+    score: score,
+    combo: combo,
+    lines: lines,
+    timestamp: Date.now()
+  };
+
+  highscores.records[mode].push(record);
+  // Sort by score descending
+  highscores.records[mode].sort((a, b) => b.score - a.score);
+  // Keep only top 10
+  if (highscores.records[mode].length > 10) {
+    highscores.records[mode] = highscores.records[mode].slice(0, 10);
+  }
+
+  saveHighscores();
+}
+
+function renderRecordsList(mode, currentScore, currentLines) {
+  if (!highscores.records || !highscores.records[mode]) {
+    overlayRecords.innerHTML = '<p style="color: #aaa; font-size: 11px;">Sin registros aún</p>';
+    return;
+  }
+
+  const records = highscores.records[mode];
+  if (records.length === 0) {
+    overlayRecords.innerHTML = '<p style="color: #aaa; font-size: 11px;">Sin registros aún</p>';
+    return;
+  }
+
+  let html = '<div style="color: #ccc; font-family: monospace;">';
+  html += '<p style="margin: 5px 0; font-weight: bold; color: var(--c1);">TOP 5 RÉCORDS</p>';
+
+  records.slice(0, 5).forEach((record, idx) => {
+    const isCurrentScore = record.score === currentScore && record.lines === currentLines;
+    const highlight = isCurrentScore ? ' style="background: rgba(100,200,150,0.2); padding: 2px 4px;"' : '';
+    html += `<div${highlight}>`;
+    html += `<span style="color: #999;">${idx + 1}.</span> `;
+    html += `<span style="color: #4dd0e1;">${escapeHtml(record.name)}</span> `;
+    html += `<span style="color: #ffd54f;">${record.score.toLocaleString()}</span> `;
+    html += `<span style="color: #ba68c8; font-size: 10px;">x${record.combo}</span>`;
+    html += `</div>`;
+  });
+
+  html += '</div>';
+  overlayRecords.innerHTML = html;
 }
 
 function applySettings() {
@@ -1274,6 +1340,33 @@ function endGame(reason) {
   }
   saveHighscores();
   overlayScore.textContent = scoreLine + (isRecord ? '  🏆 ¡NUEVO RÉCORD!' : '');
+
+  // Show name input, focus it
+  playerNameInput.value = '';
+  playerNameInput.style.display = 'block';
+  overlayRecords.innerHTML = '';
+  playerNameInput.focus();
+
+  // Store current score/lines for rendering
+  const gameScore = score;
+  const gameLines = lines;
+
+  // Capture name on Enter or when restarting
+  const submitRecord = () => {
+    const playerName = playerNameInput.value.trim() || 'Anónimo';
+    insertRecord(mode, gameScore, playerName, stats.maxCombo, gameLines);
+    renderRecordsList(mode, gameScore, gameLines);
+    playerNameInput.style.display = 'none';
+    playerNameInput.onkeypress = null;
+  };
+
+  playerNameInput.onkeypress = (e) => {
+    if (e.key === 'Enter') submitRecord();
+  };
+
+  // Use direct onclick assignment to replace any previous handler
+  restartBtn.onclick = submitRecord;
+
   overlay.classList.remove('hidden');
 }
 
@@ -1293,6 +1386,7 @@ function togglePause() {
     pauseControlsList.classList.add('hidden');
     pauseControlsToggle.textContent = 'Ver controles';
     startLevelSelect.value = String(settings.startLevel);
+    playerNameInput.style.display = 'none';
     pauseOverlay.classList.remove('hidden');
   }
 }
@@ -1511,6 +1605,7 @@ function updateHighscoreLine() {
 
 function showStartOverlay() {
   overlay.classList.add('hidden');
+  playerNameInput.style.display = 'none';
   updateHighscoreLine();
   startOverlay.classList.remove('hidden');
 }
