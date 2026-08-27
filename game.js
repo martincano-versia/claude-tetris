@@ -173,7 +173,7 @@ let selectedMode = 'marathon';
 
 const MAX_START_LEVEL = 15;
 const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, startLevel: 1 };
-const highscores = { marathon: 0, sprint: null, ultra: 0 };
+const highscores = { marathon: [], sprint: [], ultra: [] };
 
 // ---- Persistencia ----
 function loadSettings() {
@@ -191,12 +191,39 @@ function saveSettings() {
 function loadHighscores() {
   try {
     const raw = localStorage.getItem(HIGHSCORE_KEY);
-    if (raw) Object.assign(highscores, JSON.parse(raw));
+    if (raw) {
+      const loaded = JSON.parse(raw);
+      // Backward compatibility: convert old format {mode: score} to new format {mode: [{score, name, ...}]}
+      const converted = {};
+      for (const key in loaded) {
+        const value = loaded[key];
+        if (Array.isArray(value)) {
+          converted[key] = value;
+        } else if (value === null) {
+          converted[key] = [];
+        } else if (typeof value === 'number') {
+          // Old format: wrap score in array with default name
+          converted[key] = [{ score: value, name: 'Champion', combo: 0, lines: 0, date: '' }];
+        } else {
+          converted[key] = [];
+        }
+      }
+      Object.assign(highscores, converted);
+    }
   } catch (e) { /* ignorar */ }
 }
 
 function saveHighscores() {
   try { localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(highscores)); } catch (e) { /* ignorar */ }
+}
+
+function insertRecord(mode, score, name, combo, lines) {
+  if (!highscores[mode]) highscores[mode] = [];
+  const record = { score, name: name || 'Anónimo', combo, lines, date: new Date().toLocaleDateString('es-ES') };
+  highscores[mode].push(record);
+  highscores[mode].sort((a, b) => b.score - a.score);
+  highscores[mode] = highscores[mode].slice(0, 5); // keep top 5
+  saveHighscores();
 }
 
 function applySettings() {
