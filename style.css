@@ -644,6 +644,37 @@ kbd {
   color: var(--c3);
 }
 
+#pause-title {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: var(--c1);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--c1) 60%, transparent);
+}
+
+.pause-controls-list {
+  width: 100%;
+}
+
+.pause-controls-list.hidden {
+  display: none;
+}
+
+#start-level-row {
+  width: 220px;
+}
+
+#start-level-row select {
+  background: linear-gradient(180deg, #26264a, #1c1c34);
+  border: 1px solid #3f3f70;
+  border-radius: 6px;
+  color: #bcbce0;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 /* ---- Opciones ---- */
 .options-list {
   display: flex;
