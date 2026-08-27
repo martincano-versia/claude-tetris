@@ -148,6 +148,7 @@ const volumeRange = document.getElementById('volume-range');
 const colorblindToggle = document.getElementById('colorblind-toggle');
 const closeOptionsBtn = document.getElementById('close-options-btn');
 const swatches = document.querySelectorAll('.swatch');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
 
 const tLeft = document.getElementById('t-left');
 const tRight = document.getElementById('t-right');
@@ -1549,6 +1550,19 @@ swatches.forEach(sw => sw.addEventListener('click', () => {
   saveSettings();
   document.body.classList.add('theme-shift');
 }));
+
+resetRecordsBtn.addEventListener('click', () => {
+  if (confirm('¿Borrar todos los récords? Esta acción no se puede deshacer.')) {
+    highscores.marathon = [];
+    highscores.sprint = [];
+    highscores.ultra = [];
+    saveHighscores();
+    // Refresh records display if visible
+    if (typeof renderRecordsList === 'function') {
+      renderRecordsList(selectedMode);
+    }
+  }
+});
 
 // ---- Inicio y bucle principal ----
 function startGame(chosenMode) {
