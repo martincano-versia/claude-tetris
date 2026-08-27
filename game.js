@@ -160,6 +160,21 @@ const SKINS = {
   },
 };
 
+// Freeze SKINS to prevent runtime mutation
+Object.freeze(SKINS);
+Object.values(SKINS).forEach(skin => Object.freeze(skin));
+
+// Helper function to get current skin config with validation and fallback
+function getCurrentSkinConfig() {
+  const skinName = settings.skin || 'retro';
+  const skin = SKINS[skinName];
+  if (!skin) {
+    console.warn(`Invalid skin '${skinName}', falling back to retro`);
+    return SKINS.retro;
+  }
+  return skin;
+}
+
 // ---- Referencias DOM ----
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -245,6 +260,10 @@ function loadSettings() {
     if (raw) Object.assign(settings, JSON.parse(raw));
   } catch (e) { /* almacenamiento no disponible */ }
   settings.startLevel = Math.min(MAX_START_LEVEL, Math.max(1, Math.round(settings.startLevel) || 1));
+  // Validate skin setting
+  if (!SKINS[settings.skin]) {
+    settings.skin = 'retro';
+  }
 }
 
 function saveSettings() {
@@ -627,7 +646,7 @@ function pieceCenterPx(piece) {
 }
 
 function pieceColors(piece) {
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   return [skinConfig.pieceColors[piece.type]];
 }
 
@@ -699,7 +718,7 @@ function spawnLandParticles(piece) {
 }
 
 function spawnLineClearParticles(row, shape = 'diamond') {
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   for (let c = 0; c < COLS; c++) {
     const color = skinConfig.pieceColors[board[row][c]] || '#ffffff';
     const px = (c + 0.5) * BLOCK;
@@ -719,7 +738,7 @@ function spawnLineClearParticles(row, shape = 'diamond') {
 }
 
 function spawnGameOverParticles() {
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   const palette = skinConfig.pieceColors.filter(Boolean);
   spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
     count: 40, colors: palette, speed: 5.5, life: 950, size: 3.5, gravity: 0.06, shape: 'circle',
@@ -730,7 +749,7 @@ function spawnGameOverParticles() {
 }
 
 function spawnPerfectClearParticles() {
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   const palette = skinConfig.pieceColors.filter(Boolean);
   spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
     count: 90, colors: palette, speed: 6.5, life: 1200, size: 4, gravity: 0.05, shape: 'star', rotationSpeed: 0.4,
@@ -1129,7 +1148,7 @@ function drawSymbol(context, type, cx, cy, size) {
 
 function drawBlockAtPx(context, px, py, colorIndex, size, alpha = 1, colorOverride) {
   if (!colorIndex) return;
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   const color = colorOverride || skinConfig.pieceColors[colorIndex];
   context.save();
   context.globalAlpha = alpha;
@@ -1186,7 +1205,7 @@ function drawBlock(context, x, y, colorIndex, size, alpha, colorOverride) {
 }
 
 function drawGrid() {
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   ctx.strokeStyle = skinConfig.gridColor;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
@@ -1205,7 +1224,7 @@ function drawGrid() {
 
 function drawGhost(gy) {
   const dashOffset = (performance.now() / 40) % 8;
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   ctx.save();
   ctx.setLineDash([4, 4]);
   ctx.lineDashOffset = -dashOffset;
@@ -1246,7 +1265,7 @@ function draw() {
     ? Math.sin(((now - clearingLines.start) / LINE_CLEAR_DURATION) * Math.PI * 6) > 0
     : false;
 
-  const skinConfig = SKINS[settings.skin] || SKINS.retro;
+  const skinConfig = getCurrentSkinConfig();
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (!board[r][c]) continue;
@@ -1275,9 +1294,8 @@ function draw() {
     drawDropTrails();
 
     ctx.save();
-    const skinConfigGlow = SKINS[settings.skin] || SKINS.retro;
-    ctx.shadowColor = skinConfigGlow.pieceColors[current.type];
-    ctx.shadowBlur = skinConfigGlow.glowIntensity + level * skinConfigGlow.glowMultiplier;
+    ctx.shadowColor = skinConfig.pieceColors[current.type];
+    ctx.shadowBlur = skinConfig.glowIntensity + level * skinConfig.glowMultiplier;
     for (let r = 0; r < current.shape.length; r++)
       for (let c = 0; c < current.shape[r].length; c++)
         if (current.shape[r][c]) drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
