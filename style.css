@@ -800,3 +800,31 @@ input[type='checkbox'] {
     letter-spacing: 6px;
   }
 }
+
+/* ---- Records section ---- */
+.records-section {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #444;
+}
+
+.records-table {
+  width: 100%;
+  font-size: 11px;
+  color: #ccc;
+  border-collapse: collapse;
+}
+
+.records-table tbody tr {
+  border-bottom: 1px solid #333;
+}
+
+.records-table td {
+  padding: 4px;
+  text-align: left;
+}
+
+.records-table td:nth-child(3) {
+  text-align: right;
+  padding-right: 8px;
+}

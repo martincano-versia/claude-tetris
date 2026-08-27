@@ -142,6 +142,7 @@ const modeButtons = document.querySelectorAll('.mode-btn');
 const startBtn = document.getElementById('start-btn');
 const startOptionsBtn = document.getElementById('start-options-btn');
 const highscoreLine = document.getElementById('highscore-line');
+const recordsTbody = document.getElementById('records-tbody');
 
 const optionsOverlay = document.getElementById('options-overlay');
 const volumeRange = document.getElementById('volume-range');
@@ -1500,13 +1501,39 @@ modeButtons.forEach(btn => btn.addEventListener('click', () => {
   updateHighscoreLine();
 }));
 
+function renderRecordsList(mode) {
+  recordsTbody.innerHTML = '';
+  if (!highscores[mode] || highscores[mode].length === 0) {
+    recordsTbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #666;">Sin récords</td></tr>';
+    return;
+  }
+  highscores[mode].forEach((record, idx) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${idx + 1}.</td>
+      <td>${record.name}</td>
+      <td>${record.score.toLocaleString()}</td>
+    `;
+    recordsTbody.appendChild(row);
+  });
+}
+
 function updateHighscoreLine() {
   if (selectedMode === 'sprint') {
-    highscoreLine.textContent = highscores.sprint != null ? `Mejor tiempo: ${formatTime(highscores.sprint, true)}` : 'Sin récord aún';
+    if (highscores.sprint && highscores.sprint.length > 0) {
+      highscoreLine.textContent = `Mejor tiempo: ${formatTime(highscores.sprint[0].score, true)}`;
+    } else {
+      highscoreLine.textContent = 'Sin récord aún';
+    }
   } else {
-    const best = highscores[selectedMode] || 0;
-    highscoreLine.textContent = best ? `Récord: ${best.toLocaleString()}` : 'Sin récord aún';
+    const records = highscores[selectedMode];
+    if (records && records.length > 0) {
+      highscoreLine.textContent = `Récord: ${records[0].score.toLocaleString()}`;
+    } else {
+      highscoreLine.textContent = 'Sin récord aún';
+    }
   }
+  renderRecordsList(selectedMode);
 }
 
 function showStartOverlay() {
