@@ -147,7 +147,8 @@ const optionsOverlay = document.getElementById('options-overlay');
 const volumeRange = document.getElementById('volume-range');
 const colorblindToggle = document.getElementById('colorblind-toggle');
 const closeOptionsBtn = document.getElementById('close-options-btn');
-const swatches = document.querySelectorAll('.swatch');
+const swatches = document.querySelectorAll('.theme-swatches .swatch');
+const skinSwatches = document.querySelectorAll('.skin-swatches .swatch');
 
 const tLeft = document.getElementById('t-left');
 const tRight = document.getElementById('t-right');
@@ -172,7 +173,7 @@ let scoreAnim = null;
 let selectedMode = 'marathon';
 
 const MAX_START_LEVEL = 15;
-const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, startLevel: 1 };
+const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, skin: 'retro', startLevel: 1 };
 const highscores = { marathon: 0, sprint: null, ultra: 0 };
 
 // ---- Persistencia ----
@@ -204,6 +205,7 @@ function applySettings() {
   volumeRange.value = settings.volume;
   colorblindToggle.checked = settings.colorblind;
   swatches.forEach(s => s.classList.toggle('selected', s.dataset.theme === settings.theme));
+  skinSwatches.forEach(s => s.classList.toggle('selected', s.dataset.skin === settings.skin));
   startLevelSelect.value = String(settings.startLevel);
 }
 
@@ -1548,6 +1550,17 @@ swatches.forEach(sw => sw.addEventListener('click', () => {
   applySettings();
   saveSettings();
   document.body.classList.add('theme-shift');
+}));
+
+skinSwatches.forEach(sw => sw.addEventListener('click', () => {
+  settings.skin = sw.dataset.skin;
+  applySettings();
+  saveSettings();
+  if (started) {
+    draw();
+    drawNextQueue();
+    drawHold();
+  }
 }));
 
 // ---- Inicio y bucle principal ----
