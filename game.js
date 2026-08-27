@@ -130,6 +130,14 @@ const menuBtn = document.getElementById('menu-btn');
 const pauseOptionsBtn = document.getElementById('pause-options-btn');
 const optionsBtn = document.getElementById('options-btn');
 
+const pauseOverlay = document.getElementById('pause-overlay');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseControlsToggle = document.getElementById('pause-controls-toggle');
+const pauseControlsList = document.getElementById('pause-controls-list');
+const pauseOptionsOpenBtn = document.getElementById('pause-options-open-btn');
+const startLevelSelect = document.getElementById('start-level-select');
+
 const startOverlay = document.getElementById('start-overlay');
 const modeButtons = document.querySelectorAll('.mode-btn');
 const startBtn = document.getElementById('start-btn');
@@ -164,11 +172,13 @@ let particles, dropTrails, shockwaves, settlingCells;
 let ambientAccum, dangerSoundAccum;
 let danger = 0, dangerTarget = 0;
 let modeStartTime, modeElapsed;
+let gameStartLevel = 1;
 let stats;
 let scoreAnim = null;
 let selectedMode = 'marathon';
 
-const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true };
+const MAX_START_LEVEL = 15;
+const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, startLevel: 1 };
 const records = { marathon: [], sprint: [], ultra: [] };
 let pendingRecord = null;
 
@@ -178,6 +188,7 @@ function loadSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) Object.assign(settings, JSON.parse(raw));
   } catch (e) { /* almacenamiento no disponible */ }
+  settings.startLevel = Math.min(MAX_START_LEVEL, Math.max(1, Math.round(settings.startLevel) || 1));
 }
 
 function saveSettings() {
@@ -267,6 +278,16 @@ function applySettings() {
   volumeRange.value = settings.volume;
   colorblindToggle.checked = settings.colorblind;
   swatches.forEach(s => s.classList.toggle('selected', s.dataset.theme === settings.theme));
+  startLevelSelect.value = String(settings.startLevel);
+}
+
+function populateStartLevelSelect() {
+  for (let lvl = 1; lvl <= MAX_START_LEVEL; lvl++) {
+    const opt = document.createElement('option');
+    opt.value = String(lvl);
+    opt.textContent = lvl;
+    startLevelSelect.appendChild(opt);
+  }
 }
 
 // ---- Utilidades de color / dibujo ----
@@ -996,7 +1017,7 @@ function finishClearingLines() {
   }
 
   score += gained;
-  level = Math.floor(lines / 10) + 1;
+  level = gameStartLevel + Math.floor(lines / 10);
   dropInterval = Math.max(100, 1000 - (level - 1) * 90);
 
   updateHUD();
@@ -1356,6 +1377,8 @@ function togglePause() {
   if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
+    optionsOverlay.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
     lastTime = performance.now();
     loop(lastTime);
   } else {
@@ -1363,14 +1386,10 @@ function togglePause() {
     dasState.right.held = false;
     softHeld = false;
     cancelAnimationFrame(animId);
-    overlayTitle.classList.remove('glitch');
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlayStats.textContent = '';
-    nameEntry.classList.add('hidden');
-    overlayLeaderboard.innerHTML = '';
-    pendingRecord = null;
-    overlay.classList.remove('hidden');
+    pauseControlsList.classList.add('hidden');
+    pauseControlsToggle.textContent = 'Ver controles';
+    startLevelSelect.value = String(settings.startLevel);
+    pauseOverlay.classList.remove('hidden');
   }
 }
 
@@ -1604,6 +1623,18 @@ nameInput.addEventListener('keydown', e => {
   if (e.code === 'Enter') { e.preventDefault(); saveNameForRecord(); }
 });
 
+resumeBtn.addEventListener('click', () => togglePause());
+pauseRestartBtn.addEventListener('click', () => { pauseOverlay.classList.add('hidden'); startGame(mode); });
+pauseControlsToggle.addEventListener('click', () => {
+  const isHidden = pauseControlsList.classList.toggle('hidden');
+  pauseControlsToggle.textContent = isHidden ? 'Ver controles' : 'Ocultar controles';
+});
+pauseOptionsOpenBtn.addEventListener('click', () => optionsOverlay.classList.remove('hidden'));
+startLevelSelect.addEventListener('change', () => {
+  settings.startLevel = parseInt(startLevelSelect.value, 10) || 1;
+  saveSettings();
+});
+
 volumeRange.addEventListener('input', () => {
   settings.volume = parseFloat(volumeRange.value);
   saveSettings();
@@ -1630,12 +1661,13 @@ function startGame(chosenMode) {
 
 function init() {
   board = createBoard();
-  score = 0; lines = 0; level = 1;
+  gameStartLevel = settings.startLevel || 1;
+  score = 0; lines = 0; level = gameStartLevel;
   combo = -1; backToBack = false;
   hold = null; holdUsed = false;
   queue = [];
   paused = false; gameOver = false; started = true;
-  dropInterval = 1000; dropAccum = 0;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90); dropAccum = 0;
   clearingLines = null;
   particles = []; dropTrails = []; shockwaves = []; settlingCells = null;
   ambientAccum = 0; dangerSoundAccum = 0;
@@ -1733,6 +1765,7 @@ function fitAllCanvases() {
 
 window.addEventListener('resize', fitAllCanvases);
 
+populateStartLevelSelect();
 loadSettings();
 loadHighscores();
 applySettings();
