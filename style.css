@@ -528,6 +528,8 @@ kbd {
   box-shadow: 0 0 40px color-mix(in srgb, var(--c1) 20%, transparent);
   animation: overlayPop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
   max-width: 90vw;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 @keyframes overlayPop {
@@ -642,6 +644,113 @@ kbd {
 
 .link-btn:hover {
   color: var(--c3);
+}
+
+/* ---- Tabla de récords ---- */
+.leaderboard-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.leaderboard-empty {
+  font-size: 11px;
+  color: #6b6b8a;
+  letter-spacing: 1px;
+  padding: 6px 0;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.leaderboard-row.highlight {
+  border-color: var(--c1);
+  background: color-mix(in srgb, var(--c1) 18%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c1) 35%, transparent);
+  animation: pop 0.6s ease-out;
+}
+
+.lb-rank {
+  color: #6b6b8a;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lb-name {
+  color: #e0e0e0;
+  font-weight: 700;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-value {
+  font-family: 'Orbitron', 'Courier New', Courier, monospace;
+  color: var(--c1);
+  font-weight: 700;
+}
+
+.lb-meta {
+  color: #8a8aa8;
+  font-size: 10px;
+}
+
+.name-entry {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.name-entry.hidden {
+  display: none;
+}
+
+.name-entry input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--c1) 40%, transparent);
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 8px 10px;
+  width: 140px;
+  text-transform: uppercase;
+}
+
+.name-entry input:focus {
+  outline: none;
+  border-color: var(--c1);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c1) 40%, transparent);
+}
+
+.name-entry .primary-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  margin-top: 0;
 }
 
 /* ---- Opciones ---- */

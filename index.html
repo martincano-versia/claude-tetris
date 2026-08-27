@@ -104,8 +104,12 @@
         <button class="primary-btn" id="start-btn">JUGAR</button>
         <div class="overlay-links">
           <button class="link-btn" id="start-options-btn">Opciones</button>
+          <button class="link-btn" id="reset-records-btn">Borrar récords</button>
         </div>
-        <p id="highscore-line" style="font-size:11px;color:#6b6b8a;letter-spacing:1px;"></p>
+        <div class="leaderboard-box">
+          <span class="label">TOP 5</span>
+          <div class="leaderboard" id="start-leaderboard"></div>
+        </div>
       </div>
     </div>
 
@@ -114,6 +118,14 @@
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
         <p id="overlay-stats"></p>
+        <div class="name-entry hidden" id="name-entry">
+          <input type="text" id="name-input" maxlength="12" placeholder="TU NOMBRE" autocomplete="off" />
+          <button class="primary-btn" id="save-record-btn">GUARDAR</button>
+        </div>
+        <div class="leaderboard-box">
+          <span class="label">TOP 5</span>
+          <div class="leaderboard" id="overlay-leaderboard"></div>
+        </div>
         <button id="restart-btn">Reiniciar</button>
         <div class="overlay-links">
           <button class="link-btn" id="menu-btn">Menú</button>

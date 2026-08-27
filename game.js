@@ -13,7 +13,8 @@ const SETTLE_DURATION = 220;
 const ULTRA_DURATION = 120000;
 const LINE_CLEAR_DURATION = 300;
 const STORAGE_KEY = 'tetris-settings-v1';
-const HIGHSCORE_KEY = 'tetris-highscores-v1';
+const HIGHSCORE_KEY = 'tetris-highscores-v2';
+const RECORDS_LIMIT = 5;
 
 const COLORS = [
   null,
@@ -133,7 +134,12 @@ const startOverlay = document.getElementById('start-overlay');
 const modeButtons = document.querySelectorAll('.mode-btn');
 const startBtn = document.getElementById('start-btn');
 const startOptionsBtn = document.getElementById('start-options-btn');
-const highscoreLine = document.getElementById('highscore-line');
+const startLeaderboard = document.getElementById('start-leaderboard');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+const overlayLeaderboard = document.getElementById('overlay-leaderboard');
+const nameEntry = document.getElementById('name-entry');
+const nameInput = document.getElementById('name-input');
+const saveRecordBtn = document.getElementById('save-record-btn');
 
 const optionsOverlay = document.getElementById('options-overlay');
 const volumeRange = document.getElementById('volume-range');
@@ -163,7 +169,8 @@ let scoreAnim = null;
 let selectedMode = 'marathon';
 
 const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true };
-const highscores = { marathon: 0, sprint: null, ultra: 0 };
+const records = { marathon: [], sprint: [], ultra: [] };
+let pendingRecord = null;
 
 // ---- Persistencia ----
 function loadSettings() {
@@ -180,12 +187,79 @@ function saveSettings() {
 function loadHighscores() {
   try {
     const raw = localStorage.getItem(HIGHSCORE_KEY);
-    if (raw) Object.assign(highscores, JSON.parse(raw));
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    ['marathon', 'sprint', 'ultra'].forEach(m => {
+      if (Array.isArray(parsed[m])) records[m] = parsed[m].slice(0, RECORDS_LIMIT);
+    });
   } catch (e) { /* ignorar */ }
 }
 
 function saveHighscores() {
-  try { localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(highscores)); } catch (e) { /* ignorar */ }
+  try { localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(records)); } catch (e) { /* ignorar */ }
+}
+
+function qualifiesForRecords(mode, entry) {
+  const list = records[mode];
+  if (list.length < RECORDS_LIMIT) return true;
+  const worst = list[list.length - 1];
+  return mode === 'sprint' ? entry.time < worst.time : entry.score > worst.score;
+}
+
+function addRecord(mode, entry) {
+  const list = records[mode];
+  list.push(entry);
+  list.sort((a, b) => mode === 'sprint' ? a.time - b.time : b.score - a.score);
+  list.length = Math.min(list.length, RECORDS_LIMIT);
+  saveHighscores();
+}
+
+function renderLeaderboard(mode, container, extraEntry) {
+  container.innerHTML = '';
+  let list = records[mode].slice();
+  if (extraEntry && !list.includes(extraEntry)) list.push(extraEntry);
+  list.sort((a, b) => mode === 'sprint' ? a.time - b.time : b.score - a.score);
+  list = list.slice(0, RECORDS_LIMIT);
+
+  if (!list.length) {
+    const empty = document.createElement('p');
+    empty.className = 'leaderboard-empty';
+    empty.textContent = 'Sin récords aún';
+    container.appendChild(empty);
+    return;
+  }
+
+  list.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'leaderboard-row' + (r === extraEntry ? ' highlight' : '');
+
+    const rank = document.createElement('span');
+    rank.className = 'lb-rank';
+    rank.textContent = `${i + 1}`;
+
+    const name = document.createElement('span');
+    name.className = 'lb-name';
+    name.textContent = r.name || '???';
+
+    const value = document.createElement('span');
+    value.className = 'lb-value';
+    value.textContent = mode === 'sprint' ? formatTime(r.time, true) : r.score.toLocaleString();
+
+    const meta = document.createElement('span');
+    meta.className = 'lb-meta';
+    meta.textContent = `L${r.lines} · x${r.maxCombo}`;
+
+    row.append(rank, name, value, meta);
+    container.appendChild(row);
+  });
+}
+
+function resetRecords() {
+  records.marathon = [];
+  records.sprint = [];
+  records.ultra = [];
+  saveHighscores();
+  updateStartLeaderboard();
 }
 
 function applySettings() {
@@ -1238,22 +1312,44 @@ function endGame(reason) {
   const pps = stats.piecesPlaced / Math.max(1, elapsed / 1000);
   overlayStats.textContent = `Piezas: ${stats.piecesPlaced} · PPS: ${pps.toFixed(2)} · Combo máx: x${Math.max(1, stats.maxCombo)}`;
 
+  const maxCombo = Math.max(1, stats.maxCombo);
   let scoreLine = `Puntuación: ${score.toLocaleString()}`;
-  let isRecord = false;
+  let candidate = null;
   if (mode === 'sprint') {
     if (lines >= 40) {
       scoreLine = `Tiempo: ${formatTime(elapsed, true)}`;
-      if (highscores.sprint == null || elapsed < highscores.sprint) { highscores.sprint = elapsed; isRecord = true; }
+      candidate = { name: '', time: elapsed, score, lines, maxCombo };
     } else {
       scoreLine = `Líneas: ${lines} / 40`;
     }
-  } else if (score > (highscores[mode] || 0)) {
-    highscores[mode] = score;
-    isRecord = true;
+  } else {
+    candidate = { name: '', score, lines, maxCombo };
   }
-  saveHighscores();
-  overlayScore.textContent = scoreLine + (isRecord ? '  🏆 ¡NUEVO RÉCORD!' : '');
+
+  pendingRecord = candidate && qualifiesForRecords(mode, candidate) ? { mode, entry: candidate } : null;
+
+  if (pendingRecord) {
+    nameEntry.classList.remove('hidden');
+    nameInput.value = '';
+    setTimeout(() => nameInput.focus(), 50);
+  } else {
+    nameEntry.classList.add('hidden');
+  }
+
+  renderLeaderboard(mode, overlayLeaderboard, pendingRecord ? pendingRecord.entry : null);
+  overlayScore.textContent = scoreLine + (pendingRecord ? '  🏆 ¡NUEVO RÉCORD!' : '');
   overlay.classList.remove('hidden');
+}
+
+function saveNameForRecord() {
+  if (!pendingRecord) return;
+  const name = (nameInput.value || '').trim().toUpperCase().slice(0, 12) || 'JUGADOR';
+  const { mode: recordMode, entry } = pendingRecord;
+  entry.name = name;
+  addRecord(recordMode, entry);
+  nameEntry.classList.add('hidden');
+  renderLeaderboard(recordMode, overlayLeaderboard, entry);
+  pendingRecord = null;
 }
 
 function togglePause() {
@@ -1271,6 +1367,9 @@ function togglePause() {
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
     overlayStats.textContent = '';
+    nameEntry.classList.add('hidden');
+    overlayLeaderboard.innerHTML = '';
+    pendingRecord = null;
     overlay.classList.remove('hidden');
   }
 }
@@ -1316,6 +1415,7 @@ function handleInputRepeat(dt) {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   ensureAudio();
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
   if (!canAct()) return;
@@ -1475,21 +1575,16 @@ modeButtons.forEach(btn => btn.addEventListener('click', () => {
   modeButtons.forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   selectedMode = btn.dataset.mode;
-  updateHighscoreLine();
+  updateStartLeaderboard();
 }));
 
-function updateHighscoreLine() {
-  if (selectedMode === 'sprint') {
-    highscoreLine.textContent = highscores.sprint != null ? `Mejor tiempo: ${formatTime(highscores.sprint, true)}` : 'Sin récord aún';
-  } else {
-    const best = highscores[selectedMode] || 0;
-    highscoreLine.textContent = best ? `Récord: ${best.toLocaleString()}` : 'Sin récord aún';
-  }
+function updateStartLeaderboard() {
+  renderLeaderboard(selectedMode, startLeaderboard);
 }
 
 function showStartOverlay() {
   overlay.classList.add('hidden');
-  updateHighscoreLine();
+  updateStartLeaderboard();
   startOverlay.classList.remove('hidden');
 }
 
@@ -1500,6 +1595,14 @@ optionsBtn.addEventListener('click', () => optionsOverlay.classList.remove('hidd
 startOptionsBtn.addEventListener('click', () => optionsOverlay.classList.remove('hidden'));
 pauseOptionsBtn.addEventListener('click', () => optionsOverlay.classList.remove('hidden'));
 closeOptionsBtn.addEventListener('click', () => optionsOverlay.classList.add('hidden'));
+resetRecordsBtn.addEventListener('click', () => {
+  if (confirm('¿Borrar todos los récords guardados?')) resetRecords();
+});
+saveRecordBtn.addEventListener('click', saveNameForRecord);
+nameInput.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.code === 'Enter') { e.preventDefault(); saveNameForRecord(); }
+});
 
 volumeRange.addEventListener('input', () => {
   settings.volume = parseFloat(volumeRange.value);
