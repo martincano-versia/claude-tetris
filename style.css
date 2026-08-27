@@ -699,6 +699,30 @@ kbd {
   gap: 8px;
 }
 
+.skin-swatches {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skin-swatches .swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border 0.2s;
+}
+
+.skin-swatches .swatch.selected {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.skin-swatches .swatch:hover {
+  border-color: #ccc;
+}
+
 .swatch {
   width: 22px;
   height: 22px;
