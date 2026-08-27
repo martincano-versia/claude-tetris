@@ -97,6 +97,84 @@ const LINE_SCORES = [0, 100, 300, 500, 800];
 const LANDED_COLORS = ['#5b5b6e', '#666678'];
 const COMBO_LABELS = { 1: 'SINGLE', 2: 'DOUBLE', 3: 'TRIPLE', 4: 'TETRIS!' };
 
+// ---- Skins Configuration ----
+const SKINS = {
+  retro: {
+    pieceColors: COLORS,
+    gridColor: '#22222e',
+    landedColors: ['#5b5b6e', '#666678'],
+    glowIntensity: 10,
+    glowMultiplier: 1.2,
+    drawEffect: 'gradient',
+  },
+  neon: {
+    pieceColors: [
+      null,
+      '#00ffff', // I - bright cyan
+      '#ffff00', // O - bright yellow
+      '#ff00ff', // T - bright magenta
+      '#00ff00', // S - bright green
+      '#ff0000', // Z - bright red
+      '#0099ff', // J - bright blue
+      '#ffaa00', // L - bright orange
+    ],
+    gridColor: '#111111',
+    landedColors: ['#0a0a0a', '#151515'],
+    glowIntensity: 20,
+    glowMultiplier: 1.8,
+    drawEffect: 'glow',
+  },
+  pastel: {
+    pieceColors: [
+      null,
+      '#a8d8ff', // I - light cyan
+      '#fff4a8', // O - light yellow
+      '#f5c8ff', // T - light purple
+      '#c8f5c8', // S - light green
+      '#ffc8c8', // Z - light red
+      '#c8d8ff', // J - light blue
+      '#ffd8a8', // L - light orange
+    ],
+    gridColor: '#3a3a4a',
+    landedColors: ['#4a4a5a', '#5a5a6a'],
+    glowIntensity: 5,
+    glowMultiplier: 0.8,
+    drawEffect: 'soft',
+  },
+  pixelart: {
+    pieceColors: [
+      null,
+      '#00aaff', // I - pixel cyan
+      '#ffff00', // O - pixel yellow
+      '#aa00ff', // T - pixel magenta
+      '#00ff00', // S - pixel green
+      '#ff0000', // Z - pixel red
+      '#0055ff', // J - pixel blue
+      '#ff8800', // L - pixel orange
+    ],
+    gridColor: '#1a1a2e',
+    landedColors: ['#5b5b6e', '#666678'],
+    glowIntensity: 8,
+    glowMultiplier: 1.0,
+    drawEffect: 'pixel',
+  },
+};
+
+// Freeze SKINS to prevent runtime mutation
+Object.freeze(SKINS);
+Object.values(SKINS).forEach(skin => Object.freeze(skin));
+
+// Helper function to get current skin config with validation and fallback
+function getCurrentSkinConfig() {
+  const skinName = settings.skin || 'retro';
+  const skin = SKINS[skinName];
+  if (!skin) {
+    console.warn(`Invalid skin '${skinName}', falling back to retro`);
+    return SKINS.retro;
+  }
+  return skin;
+}
+
 // ---- Referencias DOM ----
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -174,7 +252,7 @@ let scoreAnim = null;
 let selectedMode = 'marathon';
 
 const MAX_START_LEVEL = 15;
-const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, startLevel: 1 };
+const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true, startLevel: 1, skin: 'retro' };
 const highscores = { marathon: [], sprint: [], ultra: [] };
 
 // ---- Persistencia ----
@@ -184,6 +262,10 @@ function loadSettings() {
     if (raw) Object.assign(settings, JSON.parse(raw));
   } catch (e) { /* almacenamiento no disponible */ }
   settings.startLevel = Math.min(MAX_START_LEVEL, Math.max(1, Math.round(settings.startLevel) || 1));
+  // Validate skin setting
+  if (!SKINS[settings.skin]) {
+    settings.skin = 'retro';
+  }
 }
 
 function saveSettings() {
@@ -593,7 +675,8 @@ function pieceCenterPx(piece) {
 }
 
 function pieceColors(piece) {
-  return [COLORS[piece.type]];
+  const skinConfig = getCurrentSkinConfig();
+  return [skinConfig.pieceColors[piece.type]];
 }
 
 function spawnMoveParticles(dir) {
@@ -664,8 +747,9 @@ function spawnLandParticles(piece) {
 }
 
 function spawnLineClearParticles(row, shape = 'diamond') {
+  const skinConfig = getCurrentSkinConfig();
   for (let c = 0; c < COLS; c++) {
-    const color = COLORS[board[row][c]] || '#ffffff';
+    const color = skinConfig.pieceColors[board[row][c]] || '#ffffff';
     const px = (c + 0.5) * BLOCK;
     const py = (row + 0.5) * BLOCK;
     spawnParticles(px, py, {
@@ -683,7 +767,8 @@ function spawnLineClearParticles(row, shape = 'diamond') {
 }
 
 function spawnGameOverParticles() {
-  const palette = COLORS.filter(Boolean);
+  const skinConfig = getCurrentSkinConfig();
+  const palette = skinConfig.pieceColors.filter(Boolean);
   spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
     count: 40, colors: palette, speed: 5.5, life: 950, size: 3.5, gravity: 0.06, shape: 'circle',
   });
@@ -693,7 +778,8 @@ function spawnGameOverParticles() {
 }
 
 function spawnPerfectClearParticles() {
-  const palette = COLORS.filter(Boolean);
+  const skinConfig = getCurrentSkinConfig();
+  const palette = skinConfig.pieceColors.filter(Boolean);
   spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
     count: 90, colors: palette, speed: 6.5, life: 1200, size: 4, gravity: 0.05, shape: 'star', rotationSpeed: 0.4,
   });
@@ -1091,21 +1177,54 @@ function drawSymbol(context, type, cx, cy, size) {
 
 function drawBlockAtPx(context, px, py, colorIndex, size, alpha = 1, colorOverride) {
   if (!colorIndex) return;
-  const color = colorOverride || COLORS[colorIndex];
+  const skinConfig = getCurrentSkinConfig();
+  const color = colorOverride || skinConfig.pieceColors[colorIndex];
   context.save();
   context.globalAlpha = alpha;
-  const grad = context.createLinearGradient(px, py, px + size, py + size);
-  grad.addColorStop(0, lighten(color, 0.35));
-  grad.addColorStop(0.5, color);
-  grad.addColorStop(1, darken(color, 0.35));
-  context.fillStyle = grad;
+
+  // Apply different effects based on skin
+  if (skinConfig.drawEffect === 'gradient' || skinConfig.drawEffect === 'soft') {
+    const grad = context.createLinearGradient(px, py, px + size, py + size);
+    if (skinConfig.drawEffect === 'gradient') {
+      grad.addColorStop(0, lighten(color, 0.35));
+      grad.addColorStop(0.5, color);
+      grad.addColorStop(1, darken(color, 0.35));
+    } else {
+      // soft: lighter gradient, no dark end
+      grad.addColorStop(0, lighten(color, 0.2));
+      grad.addColorStop(1, color);
+    }
+    context.fillStyle = grad;
+  } else {
+    context.fillStyle = color;
+  }
+
   roundRect(context, px + 1, py + 1, size - 2, size - 2, 3);
   context.fill();
-  context.fillStyle = 'rgba(255,255,255,0.18)';
-  context.fillRect(px + 2, py + 2, size - 4, Math.max(2, size * 0.14));
+
+  // Highlight stripe (skip for pastel/soft)
+  if (skinConfig.drawEffect !== 'soft') {
+    context.fillStyle = 'rgba(255,255,255,0.18)';
+    context.fillRect(px + 2, py + 2, size - 4, Math.max(2, size * 0.14));
+  }
+
+  // Border
   context.strokeStyle = 'rgba(0,0,0,0.25)';
   context.lineWidth = 1;
   context.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
+
+  // Pixel art pattern overlay (scanlines)
+  if (skinConfig.drawEffect === 'pixel') {
+    context.strokeStyle = 'rgba(0,0,0,0.4)';
+    context.lineWidth = 1;
+    for (let i = py + 2; i < py + size; i += 2) {
+      context.beginPath();
+      context.moveTo(px + 1, i);
+      context.lineTo(px + size - 1, i);
+      context.stroke();
+    }
+  }
+
   if (settings.colorblind) drawSymbol(context, colorIndex, px + size / 2, py + size / 2, size);
   context.restore();
 }
@@ -1115,7 +1234,8 @@ function drawBlock(context, x, y, colorIndex, size, alpha, colorOverride) {
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  const skinConfig = getCurrentSkinConfig();
+  ctx.strokeStyle = skinConfig.gridColor;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -1133,6 +1253,7 @@ function drawGrid() {
 
 function drawGhost(gy) {
   const dashOffset = (performance.now() / 40) % 8;
+  const skinConfig = getCurrentSkinConfig();
   ctx.save();
   ctx.setLineDash([4, 4]);
   ctx.lineDashOffset = -dashOffset;
@@ -1140,7 +1261,7 @@ function drawGhost(gy) {
     for (let c = 0; c < current.shape[r].length; c++) {
       if (!current.shape[r][c]) continue;
       const px = (current.x + c) * BLOCK, py = (gy + r) * BLOCK;
-      const color = COLORS[current.shape[r][c]];
+      const color = skinConfig.pieceColors[current.shape[r][c]];
       ctx.globalAlpha = 0.1;
       ctx.fillStyle = color;
       ctx.fillRect(px + 1, py + 1, BLOCK - 2, BLOCK - 2);
@@ -1173,10 +1294,11 @@ function draw() {
     ? Math.sin(((now - clearingLines.start) / LINE_CLEAR_DURATION) * Math.PI * 6) > 0
     : false;
 
+  const skinConfig = getCurrentSkinConfig();
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (!board[r][c]) continue;
-      let color = LANDED_COLORS[(r + c) % 2];
+      let color = skinConfig.landedColors[(r + c) % 2];
       if (flashingRows && flashingRows.has(r)) color = blink ? '#ffffff' : color;
       const key = r + ',' + c;
       if (settlingCells && settlingCells.cells.has(key) && now - settlingCells.start < SETTLE_DURATION) {
@@ -1201,8 +1323,8 @@ function draw() {
     drawDropTrails();
 
     ctx.save();
-    ctx.shadowColor = COLORS[current.type];
-    ctx.shadowBlur = 10 + level * 1.2;
+    ctx.shadowColor = skinConfig.pieceColors[current.type];
+    ctx.shadowBlur = skinConfig.glowIntensity + level * skinConfig.glowMultiplier;
     for (let r = 0; r < current.shape.length; r++)
       for (let c = 0; c < current.shape[r].length; c++)
         if (current.shape[r][c]) drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
