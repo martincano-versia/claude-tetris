@@ -94,7 +94,6 @@ const I_KICKS = {
 };
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
-const LANDED_COLORS = ['#5b5b6e', '#666678'];
 const COMBO_LABELS = { 1: 'SINGLE', 2: 'DOUBLE', 3: 'TRIPLE', 4: 'TETRIS!' };
 
 // ---- Referencias DOM ----
@@ -140,6 +139,7 @@ const volumeRange = document.getElementById('volume-range');
 const colorblindToggle = document.getElementById('colorblind-toggle');
 const closeOptionsBtn = document.getElementById('close-options-btn');
 const swatches = document.querySelectorAll('.swatch');
+const skinButtons = document.querySelectorAll('.skin-btn');
 
 const tLeft = document.getElementById('t-left');
 const tRight = document.getElementById('t-right');
@@ -162,7 +162,7 @@ let stats;
 let scoreAnim = null;
 let selectedMode = 'marathon';
 
-const settings = { volume: 0.6, colorblind: false, theme: 'aurora', audioEnabled: true };
+const settings = { volume: 0.6, colorblind: false, theme: 'aurora', skin: 'retro', audioEnabled: true };
 const highscores = { marathon: 0, sprint: null, ultra: 0 };
 
 // ---- Persistencia ----
@@ -190,9 +190,11 @@ function saveHighscores() {
 
 function applySettings() {
   document.body.setAttribute('data-theme', settings.theme);
+  document.body.setAttribute('data-skin', settings.skin);
   volumeRange.value = settings.volume;
   colorblindToggle.checked = settings.colorblind;
   swatches.forEach(s => s.classList.toggle('selected', s.dataset.theme === settings.theme));
+  skinButtons.forEach(b => b.classList.toggle('selected', b.dataset.skin === settings.skin));
 }
 
 // ---- Utilidades de color / dibujo ----
@@ -223,6 +225,112 @@ function roundRect(context, x, y, w, h, r) {
   context.arcTo(x, y + h, x, y, r);
   context.arcTo(x, y, x + w, y, r);
   context.closePath();
+}
+
+// ---- Skins: constantes de color y función de dibujo por tema visual ----
+function drawBlockRetro(context, px, py, color, size, alpha) {
+  context.save();
+  context.globalAlpha = alpha;
+  const grad = context.createLinearGradient(px, py, px + size, py + size);
+  grad.addColorStop(0, lighten(color, 0.35));
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, darken(color, 0.35));
+  context.fillStyle = grad;
+  roundRect(context, px + 1, py + 1, size - 2, size - 2, 3);
+  context.fill();
+  context.fillStyle = 'rgba(255,255,255,0.18)';
+  context.fillRect(px + 2, py + 2, size - 4, Math.max(2, size * 0.14));
+  context.strokeStyle = 'rgba(0,0,0,0.25)';
+  context.lineWidth = 1;
+  context.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
+  context.restore();
+}
+
+function drawBlockNeon(context, px, py, color, size, alpha) {
+  context.save();
+  context.globalAlpha = alpha;
+  context.shadowColor = color;
+  context.shadowBlur = size * 0.55;
+  context.fillStyle = 'rgba(6,6,16,0.85)';
+  roundRect(context, px + 1, py + 1, size - 2, size - 2, 2);
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = color;
+  context.stroke();
+  context.shadowBlur = 0;
+  context.globalAlpha = alpha * 0.35;
+  context.fillStyle = color;
+  roundRect(context, px + 4, py + 4, size - 8, size - 8, 2);
+  context.fill();
+  context.restore();
+}
+
+function drawBlockPastel(context, px, py, color, size, alpha) {
+  context.save();
+  context.globalAlpha = alpha;
+  const r = size * 0.28;
+  const grad = context.createLinearGradient(px, py, px, py + size);
+  grad.addColorStop(0, lighten(color, 0.25));
+  grad.addColorStop(1, lighten(color, 0.05));
+  context.fillStyle = grad;
+  roundRect(context, px + 2, py + 2, size - 4, size - 4, r);
+  context.fill();
+  context.strokeStyle = 'rgba(255,255,255,0.65)';
+  context.lineWidth = 1.5;
+  roundRect(context, px + 2, py + 2, size - 4, size - 4, r);
+  context.stroke();
+  context.restore();
+}
+
+function drawBlockPixel(context, px, py, color, size, alpha) {
+  context.save();
+  context.globalAlpha = alpha;
+  const sub = Math.max(2, Math.floor(size / 6));
+  const cols = Math.ceil(size / sub);
+  const dark = darken(color, 0.3);
+  const light = lighten(color, 0.15);
+  for (let ry = 0; ry < cols; ry++) {
+    for (let rx = 0; rx < cols; rx++) {
+      const isEdge = rx === 0 || ry === 0 || rx === cols - 1 || ry === cols - 1;
+      context.fillStyle = isEdge ? dark : ((rx + ry) % 2 === 0 ? color : light);
+      context.fillRect(Math.round(px + rx * sub), Math.round(py + ry * sub), sub, sub);
+    }
+  }
+  context.strokeStyle = 'rgba(0,0,0,0.5)';
+  context.lineWidth = 1;
+  context.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
+  context.restore();
+}
+
+const SKINS = {
+  retro: {
+    colors: [null, '#4dd0e1', '#ffd54f', '#ba68c8', '#81c784', '#e57373', '#7986cb', '#ffb74d'],
+    landed: ['#5b5b6e', '#666678'],
+    glow: 1,
+    drawBlock: drawBlockRetro,
+  },
+  neon: {
+    colors: [null, '#00fff2', '#faff00', '#ff00f7', '#00ff6a', '#ff0044', '#3d5bff', '#ff8c00'],
+    landed: ['#12122a', '#191938'],
+    glow: 2.6,
+    drawBlock: drawBlockNeon,
+  },
+  pastel: {
+    colors: [null, '#a8e6f0', '#fff3b0', '#d9b8e8', '#b8e8c0', '#f4b8b8', '#b8c0f0', '#f5d3a8'],
+    landed: ['#e6dcee', '#eee6dc'],
+    glow: 0.5,
+    drawBlock: drawBlockPastel,
+  },
+  pixel: {
+    colors: [null, '#00d8d8', '#f8d800', '#b800f8', '#00b800', '#f80000', '#0058f8', '#f87800'],
+    landed: ['#303048', '#383850'],
+    glow: 0,
+    drawBlock: drawBlockPixel,
+  },
+};
+
+function currentSkin() {
+  return SKINS[settings.skin] || SKINS.retro;
 }
 
 function drawStar(context, cx, cy, outerR, innerR, points) {
@@ -543,7 +651,7 @@ function pieceCenterPx(piece) {
 }
 
 function pieceColors(piece) {
-  return [COLORS[piece.type]];
+  return [currentSkin().colors[piece.type]];
 }
 
 function spawnMoveParticles(dir) {
@@ -615,7 +723,7 @@ function spawnLandParticles(piece) {
 
 function spawnLineClearParticles(row, shape = 'diamond') {
   for (let c = 0; c < COLS; c++) {
-    const color = COLORS[board[row][c]] || '#ffffff';
+    const color = currentSkin().colors[board[row][c]] || '#ffffff';
     const px = (c + 0.5) * BLOCK;
     const py = (row + 0.5) * BLOCK;
     spawnParticles(px, py, {
@@ -633,7 +741,7 @@ function spawnLineClearParticles(row, shape = 'diamond') {
 }
 
 function spawnGameOverParticles() {
-  const palette = COLORS.filter(Boolean);
+  const palette = currentSkin().colors.filter(Boolean);
   spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
     count: 40, colors: palette, speed: 5.5, life: 950, size: 3.5, gravity: 0.06, shape: 'circle',
   });
@@ -643,7 +751,7 @@ function spawnGameOverParticles() {
 }
 
 function spawnPerfectClearParticles() {
-  const palette = COLORS.filter(Boolean);
+  const palette = currentSkin().colors.filter(Boolean);
   spawnParticles((COLS * BLOCK) / 2, (ROWS * BLOCK) / 2, {
     count: 90, colors: palette, speed: 6.5, life: 1200, size: 4, gravity: 0.05, shape: 'star', rotationSpeed: 0.4,
   });
@@ -1041,23 +1149,10 @@ function drawSymbol(context, type, cx, cy, size) {
 
 function drawBlockAtPx(context, px, py, colorIndex, size, alpha = 1, colorOverride) {
   if (!colorIndex) return;
-  const color = colorOverride || COLORS[colorIndex];
-  context.save();
-  context.globalAlpha = alpha;
-  const grad = context.createLinearGradient(px, py, px + size, py + size);
-  grad.addColorStop(0, lighten(color, 0.35));
-  grad.addColorStop(0.5, color);
-  grad.addColorStop(1, darken(color, 0.35));
-  context.fillStyle = grad;
-  roundRect(context, px + 1, py + 1, size - 2, size - 2, 3);
-  context.fill();
-  context.fillStyle = 'rgba(255,255,255,0.18)';
-  context.fillRect(px + 2, py + 2, size - 4, Math.max(2, size * 0.14));
-  context.strokeStyle = 'rgba(0,0,0,0.25)';
-  context.lineWidth = 1;
-  context.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
+  const skin = currentSkin();
+  const color = colorOverride || skin.colors[colorIndex] || COLORS[colorIndex];
+  skin.drawBlock(context, px, py, color, size, alpha);
   if (settings.colorblind) drawSymbol(context, colorIndex, px + size / 2, py + size / 2, size);
-  context.restore();
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha, colorOverride) {
@@ -1090,7 +1185,7 @@ function drawGhost(gy) {
     for (let c = 0; c < current.shape[r].length; c++) {
       if (!current.shape[r][c]) continue;
       const px = (current.x + c) * BLOCK, py = (gy + r) * BLOCK;
-      const color = COLORS[current.shape[r][c]];
+      const color = currentSkin().colors[current.shape[r][c]];
       ctx.globalAlpha = 0.1;
       ctx.fillStyle = color;
       ctx.fillRect(px + 1, py + 1, BLOCK - 2, BLOCK - 2);
@@ -1123,10 +1218,11 @@ function draw() {
     ? Math.sin(((now - clearingLines.start) / LINE_CLEAR_DURATION) * Math.PI * 6) > 0
     : false;
 
+  const skin = currentSkin();
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (!board[r][c]) continue;
-      let color = LANDED_COLORS[(r + c) % 2];
+      let color = skin.landed[(r + c) % 2];
       if (flashingRows && flashingRows.has(r)) color = blink ? '#ffffff' : color;
       const key = r + ',' + c;
       if (settlingCells && settlingCells.cells.has(key) && now - settlingCells.start < SETTLE_DURATION) {
@@ -1151,8 +1247,8 @@ function draw() {
     drawDropTrails();
 
     ctx.save();
-    ctx.shadowColor = COLORS[current.type];
-    ctx.shadowBlur = 10 + level * 1.2;
+    ctx.shadowColor = skin.colors[current.type];
+    ctx.shadowBlur = (10 + level * 1.2) * skin.glow;
     for (let r = 0; r < current.shape.length; r++)
       for (let c = 0; c < current.shape[r].length; c++)
         if (current.shape[r][c]) drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
@@ -1514,6 +1610,16 @@ swatches.forEach(sw => sw.addEventListener('click', () => {
   applySettings();
   saveSettings();
   document.body.classList.add('theme-shift');
+}));
+skinButtons.forEach(btn => btn.addEventListener('click', () => {
+  settings.skin = btn.dataset.skin;
+  applySettings();
+  saveSettings();
+  if (started) {
+    draw();
+    drawNextQueue();
+    drawHold();
+  }
 }));
 
 // ---- Inicio y bucle principal ----

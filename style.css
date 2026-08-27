@@ -210,6 +210,24 @@ body.theme-shift {
   50% { filter: brightness(1.06); }
 }
 
+[data-skin='neon'] #board,
+[data-skin='neon'] #next-canvas,
+[data-skin='neon'] #hold-canvas {
+  background: #000000;
+}
+
+[data-skin='pastel'] #board,
+[data-skin='pastel'] #next-canvas,
+[data-skin='pastel'] #hold-canvas {
+  background: #2b2b3a;
+}
+
+[data-skin='pixel'] #board,
+[data-skin='pixel'] #next-canvas,
+[data-skin='pixel'] #hold-canvas {
+  background: #101018;
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0) translateY(0) rotate(0deg); }
   15% { transform: translateX(-10px) translateY(3px) rotate(-0.6deg); }
@@ -678,6 +696,35 @@ kbd {
 
 .swatch.selected {
   border-color: #fff;
+}
+
+.option-row-wrap {
+  flex-wrap: wrap;
+}
+
+.skin-select {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.skin-btn {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #c0c0d0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--c1) 25%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.skin-btn.selected {
+  color: #fff;
+  border-color: var(--c1);
+  background: color-mix(in srgb, var(--c1) 25%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c1) 25%, transparent);
 }
 
 input[type='range'] {
