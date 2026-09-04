@@ -158,6 +158,23 @@ const SKINS = {
     glowMultiplier: 1.0,
     drawEffect: 'pixel',
   },
+  claude: {
+    pieceColors: [
+      null,
+      '#ff9500', // I - orange
+      '#ff7a00', // O - orange
+      '#ff8c00', // T - orange
+      '#ff9500', // S - orange
+      '#ff7a00', // Z - orange
+      '#ff8c00', // J - orange
+      '#ff9500', // L - orange
+    ],
+    gridColor: '#e8eef5',
+    landedColors: ['#d1dce8', '#c0cfe3'],
+    glowIntensity: 12,
+    glowMultiplier: 1.3,
+    drawEffect: 'claude',
+  },
 };
 
 // Freeze SKINS to prevent runtime mutation
@@ -239,6 +256,7 @@ const tHold = document.getElementById('t-hold');
 
 // ---- Estado del juego ----
 let board, current, hold, holdUsed, queue;
+let eyePositions = new Set(); // Track positions with eyes in Claude skin
 let score, lines, level, combo, backToBack;
 let paused, gameOver, started, mode;
 let lastTime, dropAccum, dropInterval, animId, clearingLines;
@@ -445,7 +463,15 @@ function fillQueue() {
 function newPiece(type) {
   const shape = ROTATION_SHAPES[type][0];
   const width = shape[0].length;
-  return { type, shape, rotation: 0, x: Math.floor(COLS / 2) - Math.floor(width / 2), y: 0 };
+  // Count blocks in piece to choose random eye block
+  let blockCount = 0;
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (shape[r][c]) blockCount++;
+    }
+  }
+  const eyeBlock = Math.floor(Math.random() * blockCount);
+  return { type, shape, rotation: 0, x: Math.floor(COLS / 2) - Math.floor(width / 2), y: 0, eyeBlock };
 }
 
 function takeFromQueue() {
@@ -505,10 +531,20 @@ function attemptRotate(dir) {
 }
 
 function merge() {
-  for (let r = 0; r < current.shape.length; r++)
-    for (let c = 0; c < current.shape[r].length; c++)
-      if (current.shape[r][c])
+  const skinConfig = getCurrentSkinConfig();
+  let blockIndex = 0;
+  for (let r = 0; r < current.shape.length; r++) {
+    for (let c = 0; c < current.shape[r].length; c++) {
+      if (current.shape[r][c]) {
         board[current.y + r][current.x + c] = current.shape[r][c];
+        // Save eye position for Claude skin
+        if (skinConfig.drawEffect === 'claude' && blockIndex === current.eyeBlock) {
+          eyePositions.add(`${current.y + r},${current.x + c}`);
+        }
+        blockIndex++;
+      }
+    }
+  }
 }
 
 function detectTSpin(piece) {
@@ -1020,6 +1056,19 @@ function finishClearingLines() {
   const emptyRows = Array.from({ length: cleared }, () => new Array(COLS).fill(0));
   board = emptyRows.concat(remaining);
 
+  // Update eye positions after line clear
+  const newEyePositions = new Set();
+  eyePositions.forEach(pos => {
+    const [r, c] = pos.split(',').map(Number);
+    if (!rows.has(r)) {
+      // Count how many cleared rows are above this position
+      const clearedAbove = Array.from(rows).filter(cr => cr < r).length;
+      const newR = r - clearedAbove;
+      newEyePositions.add(`${newR},${c}`);
+    }
+  });
+  eyePositions = newEyePositions;
+
   const prevLevel = level;
   lines += cleared;
 
@@ -1177,7 +1226,7 @@ function drawSymbol(context, type, cx, cy, size) {
   context.restore();
 }
 
-function drawBlockAtPx(context, px, py, colorIndex, size, alpha = 1, colorOverride) {
+function drawBlockAtPx(context, px, py, colorIndex, size, alpha = 1, colorOverride, hasEyes = false) {
   if (!colorIndex) return;
   const skinConfig = getCurrentSkinConfig();
   const color = colorOverride || skinConfig.pieceColors[colorIndex];
@@ -1227,12 +1276,79 @@ function drawBlockAtPx(context, px, py, colorIndex, size, alpha = 1, colorOverri
     }
   }
 
+  // Claude Code effect: orange blocks with mascot eyes
+  if (skinConfig.drawEffect === 'claude') {
+    // Clear shadow state
+    context.shadowBlur = 0;
+    context.shadowColor = 'transparent';
+
+    // Outer glow layer
+    const glowAlpha = context.globalAlpha;
+    context.globalAlpha = glowAlpha * 0.3;
+    context.fillStyle = color;
+    roundRect(context, px - 2, py - 2, size + 4, size + 4, 4);
+    context.fill();
+    context.globalAlpha = glowAlpha;
+
+    // Main block with gradient
+    const grad = context.createLinearGradient(px, py, px + size, py + size);
+    grad.addColorStop(0, lighten(color, 0.3));
+    grad.addColorStop(0.5, color);
+    grad.addColorStop(1, darken(color, 0.15));
+    context.fillStyle = grad;
+    roundRect(context, px + 1, py + 1, size - 2, size - 2, 3);
+    context.fill();
+
+    // Top shine highlight
+    context.fillStyle = 'rgba(255,255,255,0.25)';
+    roundRect(context, px + 2, py + 2, size - 4, Math.max(1, size * 0.12), 2);
+    context.fill();
+
+    // Clean border
+    context.strokeStyle = darken(color, 0.4);
+    context.lineWidth = 1;
+    roundRect(context, px + 1, py + 1, size - 2, size - 2, 3);
+    context.stroke();
+
+    // Inner accent line (Claude minimalist detail)
+    context.strokeStyle = 'rgba(255,255,255,0.15)';
+    context.lineWidth = 0.5;
+    roundRect(context, px + 2.5, py + 2.5, size - 5, size - 5, 2);
+    context.stroke();
+
+    // Claude mascot eyes - only on selected block
+    if (hasEyes) {
+      const eyeSize = Math.max(2, size * 0.12);
+      const eyeOffsetY = size * 0.45;
+      const eyeSpacing = size * 0.24;
+
+      // Eyes color - black
+      context.fillStyle = 'rgba(0,0,0,0.85)';
+
+      // Left eye (square)
+      context.fillRect(
+        px + size/2 - eyeSpacing - eyeSize/2,
+        py + eyeOffsetY - eyeSize/2,
+        eyeSize,
+        eyeSize
+      );
+
+      // Right eye (square)
+      context.fillRect(
+        px + size/2 + eyeSpacing - eyeSize/2,
+        py + eyeOffsetY - eyeSize/2,
+        eyeSize,
+        eyeSize
+      );
+    }
+  }
+
   if (settings.colorblind) drawSymbol(context, colorIndex, px + size / 2, py + size / 2, size);
   context.restore();
 }
 
-function drawBlock(context, x, y, colorIndex, size, alpha, colorOverride) {
-  drawBlockAtPx(context, x * size, y * size, colorIndex, size, alpha, colorOverride);
+function drawBlock(context, x, y, colorIndex, size, alpha, colorOverride, hasEyes = false) {
+  drawBlockAtPx(context, x * size, y * size, colorIndex, size, alpha, colorOverride, hasEyes);
 }
 
 function drawGrid() {
@@ -1303,6 +1419,7 @@ function draw() {
       let color = skinConfig.landedColors[(r + c) % 2];
       if (flashingRows && flashingRows.has(r)) color = blink ? '#ffffff' : color;
       const key = r + ',' + c;
+      const hasEyes = eyePositions.has(key);
       if (settlingCells && settlingCells.cells.has(key) && now - settlingCells.start < SETTLE_DURATION) {
         const t = (now - settlingCells.start) / SETTLE_DURATION;
         const { sx, sy } = squashScale(t, settlingCells.strength);
@@ -1311,10 +1428,10 @@ function draw() {
         ctx.translate(cx, cy);
         ctx.scale(sx, sy);
         ctx.translate(-cx, -cy);
-        drawBlock(ctx, c, r, board[r][c], BLOCK, 1, color);
+        drawBlock(ctx, c, r, board[r][c], BLOCK, 1, color, hasEyes);
         ctx.restore();
       } else {
-        drawBlock(ctx, c, r, board[r][c], BLOCK, 1, color);
+        drawBlock(ctx, c, r, board[r][c], BLOCK, 1, color, hasEyes);
       }
     }
   }
@@ -1327,9 +1444,16 @@ function draw() {
     ctx.save();
     ctx.shadowColor = skinConfig.pieceColors[current.type];
     ctx.shadowBlur = skinConfig.glowIntensity + level * skinConfig.glowMultiplier;
-    for (let r = 0; r < current.shape.length; r++)
-      for (let c = 0; c < current.shape[r].length; c++)
-        if (current.shape[r][c]) drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+    let blockIndex = 0;
+    for (let r = 0; r < current.shape.length; r++) {
+      for (let c = 0; c < current.shape[r].length; c++) {
+        if (current.shape[r][c]) {
+          const hasEyes = skinConfig.drawEffect === 'claude' && blockIndex === current.eyeBlock;
+          drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK, 1, null, hasEyes);
+          blockIndex++;
+        }
+      }
+    }
     ctx.restore();
   }
 
@@ -1723,6 +1847,10 @@ colorblindToggle.addEventListener('change', () => {
   saveSettings();
 });
 swatches.forEach(sw => sw.addEventListener('click', () => {
+  // If selecting any theme, disable Claude skin auto-theme
+  if (settings.skin === 'claude') {
+    settings.skin = 'retro';
+  }
   settings.theme = sw.dataset.theme;
   applySettings();
   saveSettings();
@@ -1744,6 +1872,13 @@ resetRecordsBtn.addEventListener('click', () => {
 
 skinSwatches.forEach(sw => sw.addEventListener('click', () => {
   settings.skin = sw.dataset.skin;
+  // Auto-change theme when selecting Claude skin
+  if (sw.dataset.skin === 'claude') {
+    settings.theme = 'claude';
+  } else {
+    // Change back to default theme if leaving Claude skin
+    settings.theme = 'aurora';
+  }
   applySettings();
   saveSettings();
   if (started) {
@@ -1773,6 +1908,7 @@ function init() {
   dropInterval = Math.max(100, 1000 - (level - 1) * 90); dropAccum = 0;
   clearingLines = null;
   particles = []; dropTrails = []; shockwaves = []; settlingCells = null;
+  eyePositions = new Set();
   ambientAccum = 0; dangerSoundAccum = 0;
   danger = 0; dangerTarget = 0;
   lockTimer = 0; lockResets = 0; lastActionWasRotate = false;
